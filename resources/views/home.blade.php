@@ -126,7 +126,7 @@
 
     <!-- Main -->
     <main
-        class="hero-bg relative min-h-[calc(100vh-1.5rem)] sm:min-h-[calc(100vh-2.5rem)] lg:min-h-[calc(100vh-3rem)] overflow-hidden rounded-[28px] sm:rounded-[36px]"
+        class="bg-[url('storage/home/hero.jpg')] relative min-h-[calc(100vh-1.5rem)] sm:min-h-[calc(100vh-2.5rem)] lg:min-h-[calc(100vh-3rem)] overflow-hidden rounded-[28px] sm:rounded-[36px]"
     >
 
         <!-- Overlay -->
