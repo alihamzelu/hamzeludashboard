@@ -124,7 +124,6 @@
                         type="email"
                         name="email"
                         value="{{ old('email', auth()->user()->email) }}"
-                        required
                         class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
 
                     @error('email')
