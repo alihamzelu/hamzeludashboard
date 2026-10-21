@@ -59,10 +59,8 @@ class TeamController extends Controller
         ));
     }
 
-    public function addToProject(
-        Request $request,
-        User $user
-    ): RedirectResponse {
+    public function addToProject(Request $request, User $user): RedirectResponse
+    {
         $currentUser = $request->user();
 
         abort_if($user->id === $currentUser->id, 422, 'نمی‌توانید خودتان را اضافه کنید.');
@@ -108,6 +106,79 @@ class TeamController extends Controller
 
         return back()->with('success', 'عضو با موفقیت به پروژه اضافه شد.');
     }
+
+    public function edit(Request $request, User $user): View
+    {
+        $currentUser = $request->user();
+
+        abort_if($user->id === $currentUser->id, 403);
+
+        $project = $currentUser->ownedProjects()
+            ->whereHas('members', function ($query) use ($user) {
+                $query->where('users.id', $user->id);
+            })
+            ->first();
+
+        abort_unless($project, 403);
+
+        $this->authorize('editMember', [$project, $user]);
+
+        return view('teams.edit', compact('user', 'project'));
+    }
+
+    public function update(Request $request, User $user): RedirectResponse
+    {
+        $currentUser = $request->user();
+
+        abort_if($user->id === $currentUser->id, 403);
+
+        $project = $currentUser->ownedProjects()
+            ->whereHas('members', function ($query) use ($user) {
+                $query->where('users.id', $user->id);
+            })
+            ->first();
+
+        abort_unless($project, 403);
+
+        $this->authorize('editMember', [$project, $user]);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'username' => ['required', 'string', 'max:255', 'unique:users,username,' . $user->id],
+        ]);
+
+        $user->update($validated);
+
+        return redirect()
+            ->route('teams.edit', $user->username)
+            ->with('status', 'profile-updated');
+    }
+
+    public function updatePassword(Request $request, User $user): RedirectResponse
+    {
+        $currentUser = $request->user();
+
+        abort_if($user->id === $currentUser->id, 403);
+
+        $project = $currentUser->ownedProjects()
+            ->whereHas('members', function ($query) use ($user) {
+                $query->where('users.id', $user->id);
+            })
+            ->first();
+
+        abort_unless($project, 403);
+
+        $this->authorize('editMember', [$project, $user]);
+
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user->update([
+            'password' => bcrypt($validated['password']),
+        ]);
+
+        return back()->with('status', 'password-updated');
+    }
 }
-
-

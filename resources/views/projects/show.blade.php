@@ -618,24 +618,36 @@
 
                 {{-- Actions --}}
                 <td class="py-3 px-2 text-left">
-                  @can('removeMember', [$project, $member])
-                  <form
-                    action="{{ route('projects.members.destroy', [$project, $member]) }}"
-                    method="POST"
-                    onsubmit="return confirm('این عضو حذف شود؟')"
-                    class="inline">
-                    @csrf
-                    @method('DELETE')
 
-                    <button
-                      type="submit"
-                      class="text-sm text-red-500 hover:text-red-700 transition">
-                      حذف
-                    </button>
-                  </form>
-                  @else
-                  <span class="text-xs text-gray-400">—</span>
-                  @endcan
+                    @can('editMember', [$project, $member])
+                        <a
+                            href="{{ route('teams.edit', $member->username) }}"
+                            class="text-sm text-blue-500 hover:text-blue-700 transition font-medium ml-3">
+                            ویرایش
+                        </a>
+                    @else
+                        <span class="text-xs text-gray-400">—</span>
+                    @endcan
+
+                    @can('removeMember', [$project, $member])
+                        <form
+                            action="{{ route('projects.members.destroy', [$project, $member]) }}"
+                            method="POST"
+                            onsubmit="return confirm('این عضو حذف شود؟')"
+                            class="inline">
+                            @csrf
+                            @method('DELETE')
+
+                            <button
+                                type="submit"
+                                class="text-sm text-red-500 hover:text-red-700 transition font-medium">
+                                حذف
+                            </button>
+                        </form>
+                    @else
+                        <span class="text-xs text-gray-400">—</span>
+                    @endcan
+
                 </td>
               </tr>
               @endforeach

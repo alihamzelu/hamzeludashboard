@@ -17,6 +17,17 @@ use App\Http\Controllers\TaskMessageController;
 use App\Http\Controllers\ProjectMemberController;
 
 
+Route::get('/team/{user}/edit', [TeamController::class, 'edit'])
+    ->name('teams.edit');
+
+Route::patch('/team/{user}', [TeamController::class, 'update'])
+    ->name('teams.update');
+
+Route::put('/team/{user}/password', [TeamController::class, 'updatePassword'])
+    ->name('teams.password.update');
+
+    
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/messages', [MessageController::class, 'index'])->name('messages.index');
     Route::get('/messages/{conversation}', [MessageController::class, 'show'])->name('messages.show');

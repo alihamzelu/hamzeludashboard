@@ -75,4 +75,8 @@ class User extends Authenticatable
     {
         return $this->hasMany(ProjectInvitation::class, 'user_id');
     }
+    public function getRouteKeyName()
+    {
+        return 'username';
+    }
 }

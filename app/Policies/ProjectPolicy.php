@@ -7,6 +7,7 @@ use App\Models\User;
 
 class ProjectPolicy
 {
+    
     public function view(User $user, Project $project): bool
     {
         return $project->owner_id === $user->id
@@ -86,6 +87,15 @@ class ProjectPolicy
 
         return $targetMembership->pivot->role !== 'manager';
     }
+    public function editMember(User $user, Project $project, User $target): bool
+    {
+        if ($target->id === $project->owner_id) {
+            return false;
+        }
+
+        return $project->owner_id === $user->id;
+    }
+
 
     public function changeMemberRole(User $user, Project $project, User $target): bool
     {

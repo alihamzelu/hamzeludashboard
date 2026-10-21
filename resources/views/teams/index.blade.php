@@ -1,6 +1,7 @@
 <head>
     <title>مدیریت پروژه | تیم</title>
 </head>
+
 <x-dashboard-layout>
     <div class="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
@@ -13,7 +14,6 @@
         </div>
     </div>
 
-    {{-- Success / Info Messages --}}
     @if(session('success'))
         <div class="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
             <svg class="mt-0.5 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -30,7 +30,6 @@
         </div>
     @endif
 
-    {{-- Validation Errors --}}
     @if($errors->any())
         <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             <p class="mb-2 font-semibold">لطفاً موارد زیر را بررسی کنید:</p>
@@ -42,7 +41,6 @@
         </div>
     @endif
 
-    {{-- Search --}}
     <form
         action="{{ route('team.index') }}"
         method="GET"
@@ -91,7 +89,6 @@
         @endif
     </form>
 
-    {{-- Statistics --}}
     <div class="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div class="rounded-2xl border border-slate-200 bg-white p-4">
             <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
@@ -133,7 +130,6 @@
         </div>
     </div>
 
-    {{-- Team Members --}}
     <div class="mb-5 flex items-center justify-between">
         <h2 class="text-lg font-semibold text-slate-900">
             هم‌تیمی‌های شما
@@ -147,7 +143,7 @@
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3" id="team-list">
         @forelse($teams as $member)
             <div class="rounded-2xl border border-slate-200 bg-white p-5 transition duration-200 hover:border-blue-200 hover:shadow-sm">
-                {{-- Member Info --}}
+
                 <div class="mb-5 flex min-w-0 items-center gap-3">
                     <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-50 text-lg font-semibold text-blue-700">
                         @if($member->avatar)
@@ -171,9 +167,23 @@
                             {{ $member->email }}
                         </p>
                     </div>
+
+                    @can('editMember', [$ownedProjects->first(), $member])
+                        @if($ownedProjects->isNotEmpty())
+                            <a
+                                href="{{ route('teams.edit', $member->username) }}"
+                                class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                                title="ویرایش کاربر"
+                            >
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                                          d="M16.862 3.487a2.1 2.1 0 013.65 2.1L8.2 17.9l-4.2.8.8-4.2L16.862 3.487zM15 5l4 4" />
+                                </svg>
+                            </a>
+                        @endif
+                    @endcan
                 </div>
 
-                {{-- Member Stats --}}
                 <div class="mb-5 flex items-center justify-between gap-3">
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
                         <span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
@@ -186,7 +196,6 @@
                     </span>
                 </div>
 
-                {{-- Add Member to Project --}}
                 @if(isset($ownedProjects) && $ownedProjects->isNotEmpty())
                     <form
                         action="{{ route('teams.addToProject', $member) }}"
@@ -235,7 +244,7 @@
                 <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
                     <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"
-                              d="M17 20h5v-2a3 3 0 00-5.2-2M17 20H7m10 0v-2c0-.7-.2-1.4-.6-2M7 20H2v-2a3 3 0 015.2-2M7 20v-2c0-.7.2-1.4.6-2m0 0a5 5 0 019.8 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                              d="M17 20h5v-2a3 3 0 00-5.2-2M17 20H7m10 0v-2c0-.7.2-1.4.6-2M7 20H2v-2a3 3 0 015.2-2M7 20v-2c0-.7.2-1.4.6-2m0 0a5 5 0 019.8 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                 </div>
 
@@ -243,6 +252,7 @@
                     <p class="text-sm font-semibold text-slate-900">
                         نتیجه‌ای پیدا نشد
                     </p>
+
                     <p class="mt-1 text-sm text-slate-500">
                         نام یا ایمیل دیگری را جستجو کنید.
                     </p>
@@ -257,6 +267,7 @@
                     <p class="text-sm font-semibold text-slate-900">
                         هنوز هم‌تیمی‌ای ندارید
                     </p>
+
                     <p class="mt-1 text-sm text-slate-500">
                         از بخش اعضای هر پروژه، افراد را دعوت کنید.
                     </p>
