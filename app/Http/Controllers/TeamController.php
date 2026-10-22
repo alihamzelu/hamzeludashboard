@@ -126,6 +126,7 @@ class TeamController extends Controller
         return view('teams.edit', compact('user', 'project'));
     }
 
+    
     public function update(Request $request, User $user): RedirectResponse
     {
         $currentUser = $request->user();
@@ -144,9 +145,13 @@ class TeamController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $user->id],
+            'email' => ['nullable', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'username' => ['required', 'string', 'max:255', 'unique:users,username,' . $user->id],
         ]);
+
+        $validated['email'] = filled($validated['email'] ?? null)
+            ? $validated['email']
+            : null;
 
         $user->update($validated);
 
@@ -154,6 +159,7 @@ class TeamController extends Controller
             ->route('teams.edit', $user->username)
             ->with('status', 'profile-updated');
     }
+
 
     public function updatePassword(Request $request, User $user): RedirectResponse
     {

@@ -8,12 +8,19 @@ use App\Models\Task;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\View\View;
+use Morilog\Jalali\Jalalian;
 
 class DashboardController extends Controller
 {
     public function index(): View
     {
         $user = auth()->user();
+
+        /*
+        |--------------------------------------------------------------------------
+        | پروژه‌های کاربر
+        |--------------------------------------------------------------------------
+        */
 
         $projectIds = Project::query()
             ->where(function ($query) use ($user) {
@@ -23,6 +30,12 @@ class DashboardController extends Controller
                     });
             })
             ->pluck('id');
+
+        /*
+        |--------------------------------------------------------------------------
+        | پروژه‌ها
+        |--------------------------------------------------------------------------
+        */
 
         $projects = Project::query()
             ->whereIn('id', $projectIds)
@@ -45,10 +58,22 @@ class DashboardController extends Controller
             'completed'
         );
 
+        /*
+        |--------------------------------------------------------------------------
+        | تسک‌های در انتظار
+        |--------------------------------------------------------------------------
+        */
+
         $pendingTasks = Task::query()
             ->whereIn('project_id', $projectIds)
             ->where('status', '!=', 'done')
             ->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | تسک‌های امروز
+        |--------------------------------------------------------------------------
+        */
 
         $dueTodayCount = Task::query()
             ->whereIn('project_id', $projectIds)
@@ -56,19 +81,37 @@ class DashboardController extends Controller
             ->whereDate('due_date', today())
             ->count();
 
+        /*
+        |--------------------------------------------------------------------------
+        | اعضای تیم
+        |--------------------------------------------------------------------------
+        */
+
         $teamMembers = User::query()
             ->where('id', '!=', $user->id)
             ->whereHas('projects', function ($query) use ($user) {
                 $query->where(function ($query) use ($user) {
-                    $query->where('projects.owner_id', $user->id)
-                        ->orWhereHas('members', function ($query) use ($user) {
-                            $query->where('users.id', $user->id);
-                        });
+                    $query->where(
+                        'projects.owner_id',
+                        $user->id
+                    )
+                    ->orWhereHas('members', function ($query) use ($user) {
+                        $query->where(
+                            'users.id',
+                            $user->id
+                        );
+                    });
                 });
             })
             ->orderBy('name')
             ->limit(6)
             ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | نزدیک‌ترین ددلاین‌ها
+        |--------------------------------------------------------------------------
+        */
 
         $upcomingDeadlines = Task::query()
             ->with('project')
@@ -80,12 +123,24 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        /*
+        |--------------------------------------------------------------------------
+        | فعالیت‌های اخیر
+        |--------------------------------------------------------------------------
+        */
+
         $recentActivities = ProjectActivity::query()
             ->with('user')
             ->whereIn('project_id', $projectIds)
             ->latest()
             ->limit(6)
             ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | تسک‌های امروز
+        |--------------------------------------------------------------------------
+        */
 
         $todayTasks = Task::query()
             ->whereIn('project_id', $projectIds)
@@ -107,16 +162,92 @@ class DashboardController extends Controller
             ->limit(8)
             ->get();
 
-        $currentDate = now()->startOfMonth();
+        /*
+        |--------------------------------------------------------------------------
+        | تقویم شمسی
+        |--------------------------------------------------------------------------
+        */
+
+        $todayJalali = Jalalian::now();
+
+        $month = $todayJalali->getMonth();
+        $year = $todayJalali->getYear();
+
+        /*
+        |--------------------------------------------------------------------------
+        | اولین روز ماه شمسی
+        |--------------------------------------------------------------------------
+        */
+
+        $currentJalali = Jalalian::fromFormat(
+            'Y-m-d',
+            sprintf(
+                '%04d-%02d-01',
+                $year,
+                $month
+            )
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | تعداد روزهای ماه
+        |--------------------------------------------------------------------------
+        */
+
+        $daysInMonth = $currentJalali->getMonthDays();
+
+        /*
+        |--------------------------------------------------------------------------
+        | آخرین روز ماه شمسی
+        |--------------------------------------------------------------------------
+        */
+
+        $lastJalali = Jalalian::fromFormat(
+            'Y-m-d',
+            sprintf(
+                '%04d-%02d-%02d',
+                $year,
+                $month,
+                $daysInMonth
+            )
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | تبدیل به تاریخ میلادی
+        |--------------------------------------------------------------------------
+        */
+
+        $currentDate = $currentJalali
+            ->toCarbon()
+            ->startOfDay();
+
+        $lastDate = $lastJalali
+            ->toCarbon()
+            ->endOfDay();
+
+        /*
+        |--------------------------------------------------------------------------
+        | محدوده نمایش تقویم
+        |
+        | شنبه = شروع هفته
+        | جمعه = پایان هفته
+        |--------------------------------------------------------------------------
+        */
 
         $startOfCalendar = $currentDate
             ->copy()
-            ->startOfWeek(Carbon::SUNDAY);
+            ->startOfWeek(Carbon::SATURDAY);
 
-        $endOfCalendar = $currentDate
+        $endOfCalendar = $lastDate
             ->copy()
-            ->endOfMonth()
-            ->endOfWeek(Carbon::SATURDAY);
+            ->endOfWeek(Carbon::FRIDAY);
+
+        /*
+        |--------------------------------------------------------------------------
+        | پیدا کردن تاریخ‌هایی که تسک دارند
+        |--------------------------------------------------------------------------
+        */
 
         $dueDates = Task::query()
             ->whereIn('project_id', $projectIds)
@@ -126,20 +257,43 @@ class DashboardController extends Controller
                 $endOfCalendar->toDateString(),
             ])
             ->pluck('due_date')
-            ->map(fn ($date) => Carbon::parse($date)->format('Y-m-d'))
+            ->map(function ($date) {
+                return Carbon::parse($date)
+                    ->format('Y-m-d');
+            })
             ->unique()
             ->values()
             ->all();
+
+        /*
+        |--------------------------------------------------------------------------
+        | ساخت روزهای تقویم
+        |--------------------------------------------------------------------------
+        */
 
         $calendarDays = collect();
 
         $day = $startOfCalendar->copy();
 
-        while ($day <= $endOfCalendar) {
+        while ($day->lte($endOfCalendar)) {
+
+            $jalaliDay = Jalalian::fromCarbon($day);
+
             $calendarDays->push([
-                'day' => $day->day,
-                'is_current_month' => $day->month === $currentDate->month,
+                'date' => $day->copy(),
+
+                // شماره روز شمسی
+                'day_number' => $jalaliDay->getDay(),
+
+                // آیا مربوط به ماه جاری است؟
+                'is_current_month' =>
+                    $jalaliDay->getMonth() === $month
+                    && $jalaliDay->getYear() === $year,
+
+                // آیا امروز است؟
                 'is_today' => $day->isToday(),
+
+                // آیا در این روز تسک وجود دارد؟
                 'has_due' => in_array(
                     $day->format('Y-m-d'),
                     $dueDates,
@@ -150,6 +304,12 @@ class DashboardController extends Controller
             $day->addDay();
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | آمار داشبورد
+        |--------------------------------------------------------------------------
+        */
+
         $stats = [
             'active_projects' => $activeProjects->count(),
             'pending_tasks' => $pendingTasks,
@@ -157,6 +317,12 @@ class DashboardController extends Controller
             'team_members' => $teamMembers->count(),
             'completed_projects' => $completedProjects->count(),
         ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | ارسال اطلاعات به View
+        |--------------------------------------------------------------------------
+        */
 
         return view('dashboard', compact(
             'stats',
@@ -166,6 +332,8 @@ class DashboardController extends Controller
             'recentActivities',
             'teamMembers',
             'todayTasks',
+            'month',
+            'year',
             'currentDate',
             'calendarDays'
         ));

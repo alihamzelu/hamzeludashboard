@@ -288,34 +288,102 @@
 
   </div>
 
-  @php
-    $faMonths = [1=>'ژانویه',2=>'فوریه',3=>'مارس',4=>'آوریل',5=>'مه',6=>'ژوئن',7=>'ژوئیه',8=>'اوت',9=>'سپتامبر',10=>'اکتبر',11=>'نوامبر',12=>'دسامبر'];
-  @endphp
-  <div class="bg-white rounded-2xl border border-slate-200 p-6">
+@php
+    $faMonths = [
+        1 => 'فروردین',
+        2 => 'اردیبهشت',
+        3 => 'خرداد',
+        4 => 'تیر',
+        5 => 'مرداد',
+        6 => 'شهریور',
+        7 => 'مهر',
+        8 => 'آبان',
+        9 => 'آذر',
+        10 => 'دی',
+        11 => 'بهمن',
+        12 => 'اسفند',
+    ];
+
+    $weekDays = [
+        'شنبه',
+        'یکشنبه',
+        'دوشنبه',
+        'سه‌شنبه',
+        'چهارشنبه',
+        'پنجشنبه',
+        'جمعه',
+    ];
+@endphp
+
+<div class="bg-white rounded-2xl border border-slate-200 p-6">
+
+    {{-- عنوان تقویم --}}
     <div class="flex items-center justify-between mb-5">
-      <h2 class="font-semibold text-slate-900">{{ $faMonths[$currentDate->month] ?? $currentDate->format('F') }} {{ $currentDate->year }}</h2>
-      <a href="{{ route('calendar.index') }}" class="text-sm text-blue-600 transition">تقویم کامل</a>
+        <h2 class="font-semibold text-slate-900">
+            {{ $faMonths[$month] ?? '' }} {{ $year }}
+        </h2>
+
+        <a
+            href="{{ route('calendar.index') }}"
+            class="text-sm text-blue-600 transition hover:text-blue-700"
+        >
+            تقویم کامل
+        </a>
     </div>
+
+    {{-- روزهای هفته --}}
     <div class="grid grid-cols-7 gap-1 text-center text-xs mb-2">
-      @foreach(['یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه'] as $d)
-      <div class="text-slate-400 py-2">{{ $d }}</div>
-      @endforeach
+        @foreach($weekDays as $dayName)
+            <div class="text-slate-400 py-2">
+                {{ $dayName }}
+            </div>
+        @endforeach
     </div>
+
+    {{-- روزهای ماه --}}
     <div class="grid grid-cols-7 gap-1 text-center text-sm">
-      @foreach($calendarDays as $day)
-      <div @class([
-        'py-2 relative rounded-lg transition',
-        'text-slate-300' => !$day['is_current_month'],
-        'bg-blue-600 text-white font-medium' => $day['is_today'],
-        'hover:bg-blue-50' => $day['is_current_month'] && !$day['is_today'],
-      ])>
-        {{ $day['day'] }}
-        @if($day['has_due'] && !$day['is_today'])
-        <span class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full"></span>
-        @endif
-      </div>
-      @endforeach
+
+        @foreach($calendarDays as $day)
+
+            <div
+                @class([
+                    'py-2 relative rounded-lg transition',
+
+                    // روزهای ماه قبل و بعد
+                    'text-slate-300' =>
+                        !$day['is_current_month'],
+
+                    // امروز
+                    'bg-blue-600 text-white font-medium' =>
+                        $day['is_today'],
+
+                    // هاور روزهای ماه جاری
+                    'hover:bg-blue-50' =>
+                        $day['is_current_month']
+                        && !$day['is_today'],
+                ])
+            >
+
+                {{-- شماره روز شمسی --}}
+                {{ $day['day_number'] }}
+
+                {{-- علامت داشتن تسک --}}
+                @if(
+                    $day['has_due']
+                    && !$day['is_today']
+                    && $day['is_current_month']
+                )
+                    <span
+                        class="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full"
+                    ></span>
+                @endif
+
+            </div>
+
+        @endforeach
+
     </div>
-  </div>
+
+</div>
 
 </x-dashboard-layout>
