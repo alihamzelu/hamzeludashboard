@@ -69,9 +69,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/tasks', [TaskController::class, 'index'])
         ->name('tasks.index');
 
+    Route::get('/tasks/create', [TaskController::class, 'create'])
+        ->name('tasks.create');
 
+    Route::post('/tasks', [TaskController::class, 'storeMultiple'])
+        ->name('tasks.store');
+        
     Route::get('/tasks/{task}', [TaskController::class, 'show'])
         ->name('tasks.show');
+    
 
 
     Route::resource('projects', ProjectController::class);

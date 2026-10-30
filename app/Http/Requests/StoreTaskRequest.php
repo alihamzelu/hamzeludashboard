@@ -48,7 +48,8 @@ class StoreTaskRequest extends FormRequest
                 'nullable',
                 'date',
             ],
-            'assigned_to' => ['nullable', 'exists:users,id'],
+            'assigned_user_ids' => ['nullable', 'array'],
+            'assigned_user_ids.*' => ['integer', 'distinct', 'exists:users,id'],
         ];
     }
 

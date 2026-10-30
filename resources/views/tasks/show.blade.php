@@ -54,20 +54,25 @@
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div class="bg-white rounded-2xl border border-slate-200 p-4">
                 <p class="text-xs text-slate-500">مسئول</p>
-                <div class="flex items-center gap-2 mt-2">
-                    @if($task->assignedUser)
-                        <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm">
-                            {{ mb_substr($task->assignedUser->name, 0, 1) }}
+                <div class="mt-2 space-y-2">
+                    @forelse($task->users as $user)
+                        <div class="flex items-center gap-2 min-w-0">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm flex-shrink-0">
+                                {{ mb_substr($user->name, 0, 1) }}
+                            </div>
+
+                            <span class="text-sm font-medium truncate">
+                                {{ $user->name }}
+                            </span>
                         </div>
-                        <span class="text-sm font-medium truncate">{{ $task->assignedUser->name }}</span>
-                    @else
+                    @empty
                         <span class="text-sm text-slate-400">بدون مسئول</span>
-                    @endif
+                    @endforelse
                 </div>
             </div>
             <div class="bg-white rounded-2xl border border-slate-200 p-4">
                 <p class="text-xs text-slate-500">تاریخ سررسید</p>
-                <p class="text-base font-semibold mt-2">{{ $task->due_date ? $task->due_date->format('Y/m/d') : '—' }}</p>
+                <p class="text-base font-semibold mt-2">{{ $task->due_date ?  verta($task->due_date)->format('Y/m/d') : '—' }}</p>
             </div>
             <div class="bg-white rounded-2xl border border-slate-200 p-4">
                 <p class="text-xs text-slate-500">اولویت</p>

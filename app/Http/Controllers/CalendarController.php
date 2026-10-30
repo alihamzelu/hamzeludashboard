@@ -232,7 +232,7 @@ class CalendarController extends Controller
                 'is_tomorrow' => $date->isTomorrow(),
                 'color' => $isDone ? 'bg-slate-400' : 'bg-emerald-500',
                 'url' => $task->project
-                    ? route('projects.tasks.show', [
+                    ? route('tasks.show', [
                         $task->project->slug,
                         $task->id,
                     ])

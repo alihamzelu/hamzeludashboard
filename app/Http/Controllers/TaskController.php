@@ -13,198 +13,76 @@ use App\Services\ProjectActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\View\View;
- 
+
 class TaskController extends Controller
 {
-    public function store(StoreTaskRequest $request, Project $project): RedirectResponse
+    private function validateTaskAssignees(Project $project, array $userIds): array
     {
-        $this->authorize('create', $project);
+        $userIds = collect($userIds)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
 
-        $data = $request->validated();
+        $eligibleIds = $project->members
+            ->pluck('id')
+            ->push($project->owner_id)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->reject(fn ($id) => $id === (int) auth()->id());
 
-        $task = $project->tasks()->create([
-            ...$data,
-            'assigned_to' => $data['assigned_to'] ?? auth()->id(),
-        ]);
-
-        if (
-            !empty($data['assigned_to']) &&
-            (int) $data['assigned_to'] !== (int) auth()->id()
-        ) {
-            $assignee = User::find($data['assigned_to']);
-
-            if ($assignee && $assignee->notify_task_assigned) {
-                $assignee->notify(new TaskAssignedNotification($task));
-            }
-        }
-
-        $status = $task->status === 'todo' ? 'انجام نشده' :
-                  ($task->status === 'in_progress' ? 'در حال انجام' :
-                   ($task->status === 'review' ? 'بازبینی' : 'انجام‌شده'));
-
-        ProjectActivityLogger::log(
-            $project,
-            'task.created',
-            'ایجاد شد "' . $task->title . '"',
-            $task,
-            ['status' => $status]
+        abort_unless(
+            $userIds->diff($eligibleIds)->isEmpty(),
+            422,
+            'شما نمی‌توانید خودتان یا کاربری خارج از اعضای پروژه را به‌عنوان مسئول انتخاب کنید.'
         );
 
-        return back()->with('success', 'تکلیف با موفقیت ایجاد شد.');
+        return $userIds->all();
     }
 
-    public function update(UpdateTaskRequest $request, Project $project, Task $task): RedirectResponse
+    /**
+     * ذخیره مسئول‌ها و حفظ سازگاری موقت با assigned_to
+     * خروجی: شناسه مسئول‌هایی که تازه اضافه شده‌اند
+     */
+    private function syncTaskAssignees(Task $task, array $userIds): array
     {
-        abort_if($task->project_id !== $project->id, 404);
+        $oldUserIds = $task->users()
+            ->pluck('users.id')
+            ->map(fn ($id) => (int) $id);
 
-        $this->authorize('update', $task);
+        $task->users()->sync($userIds);
 
-        $data = $request->validated();
-        $oldAssignee = $task->assigned_to;
-        $oldStatus = $task->status;
-
-        $task->update($data);
-
-        // فارسی کردن استتوس قدیمی
-        $oldStatusLabel = $oldStatus === 'todo' ? 'انجام نشده' :
-                         ($oldStatus === 'in_progress' ? 'در حال انجام' :
-                          ($oldStatus === 'review' ? 'بازبینی' : 'انجام‌شده'));
-
-        $status = $task->status === 'todo' ? 'انجام نشده' :
-                  ($task->status === 'in_progress' ? 'در حال انجام' :
-                   ($task->status === 'review' ? 'بازبینی' : 'انجام‌شده'));
-
-        ProjectActivityLogger::log(
-            $project,
-            'task.updated',
-            'به‌روزرسانی شد "' . $task->title . '"',
-            $task,
-            ['old_status' => $oldStatusLabel, 'new_status' => $status]
-        );
-
-        // منطق تغییر مأمور (بدون تغییر)
-        if (
-            array_key_exists('assigned_to', $data) &&
-            (int) $data['assigned_to'] !== (int) $oldAssignee
-        ) {
-            $assignee = User::find($data['assigned_to']);
-
-            if (
-                $assignee &&
-                (int) $assignee->id !== (int) auth()->id() &&
-                $assignee->notify_task_assigned
-            ) {
-                $assignee->notify(
-                    new TaskAssignedNotification($task->fresh())
-                );
-            }
-
-            ProjectActivityLogger::log(
-                $project,
-                'task.assigned',
-                'مأمور شد "' . $task->title . '" به ' .
-                    ($assignee?->name ?? 'someone'),
-                $task
-            );
-        }
-
-        return redirect()
-            ->route('projects.show', [
-                'project' => $project,
-                'tab' => 'tasks',
-            ])
-            ->with('success', 'تکلیف با موفقیت به‌روزرسانی شد.');
-    }
-
-    public function updateStatus(Request $request, Task $task): RedirectResponse|JsonResponse
-    {
-        $this->authorize('update', $task);
-
-        $validated = $request->validate([
-            'status' => 'required|in:todo,in_progress,review,done',
-        ]);
-
-        $oldStatus = $task->status;
-        $oldStatusLabel = $oldStatus === 'todo' ? 'انجام نشده' :
-                         ($oldStatus === 'in_progress' ? 'در حال انجام' :
-                          ($oldStatus === 'review' ? 'بازبینی' : 'انجام‌شده'));
-
+        // سازگاری موقت با بخش‌های قدیمی پروژه
         $task->update([
-            'status' => $validated['status'],
+            'assigned_to' => $userIds[0] ?? null,
         ]);
 
-        $status = $validated['status'] === 'todo' ? 'انجام نشده' :
-                  ($validated['status'] === 'in_progress' ? 'در حال انجام' :
-                   ($validated['status'] === 'review' ? 'بازبینی' : 'انجام‌شده'));
-
-        if ($oldStatus !== $validated['status']) {
-            $task->loadMissing([
-                'project.members',
-                'project.owner',
-            ]);
-
-            ProjectActivityLogger::log(
-                $task->project,
-                'task.status_changed',
-                'انتقال یافت "' . $task->title . '" از ' . $oldStatusLabel . ' به ' . $status,
-                $task,
-                [
-                    'old_status' => $oldStatusLabel,
-                    'new_status' => $status,
-                ]
-            );
-
-            $recipients = $task->project->members
-                ->push($task->project->owner)
-                ->unique('id')
-                ->reject(fn ($user) => (int) $user->id === (int) auth()->id())
-                ->values();
-
-            Notification::send(
-                $recipients,
-                new TaskStatusChangedNotification(
-                    $task->fresh(),
-                    $oldStatusLabel,
-                    $status
-                )
-            );
-        }
-
-        if ($request->wantsJson() || $request->ajax()) {
-            return response()->json([
-                'success' => true,
-                'status' => $task->status,
-            ]);
-        }
-
-        return back()->with(
-            'success',
-            'وضعیت تکلیف با موفقیت به‌روزرسانی شد.'
-        );
+        return collect($userIds)
+            ->diff($oldUserIds)
+            ->values()
+            ->all();
     }
 
-    public function destroy(Project $project, Task $task): RedirectResponse
+    /**
+     * ارسال اعلان فقط به مسئول‌های جدید
+     */
+    private function notifyNewAssignees(Task $task, array $userIds): void
     {
-        abort_if($task->project_id !== $project->id, 404);
+        if (empty($userIds)) {
+            return;
+        }
 
-        $this->authorize('delete', $task);
+        $users = User::query()
+            ->whereIn('id', $userIds)
+            ->where('id', '!=', auth()->id())
+            ->where('notify_task_assigned', true)
+            ->get();
 
-        $title = $task->title;
-
-        $task->delete();
-
-        ProjectActivityLogger::log(
-            $project,
-            'task.deleted',
-            'حذف شد "' . $title . '"'
-        );
-
-        return back()->with(
-            'success',
-            'تکلیف با موفقیت حذف شد.'
-        );
+        foreach ($users as $user) {
+            $user->notify(new TaskAssignedNotification($task));
+        }
     }
 
     public function index(Request $request): View
@@ -216,30 +94,22 @@ class TaskController extends Controller
                         $query->where('users.id', auth()->id());
                     });
             })
-            ->pluck('id');
+            ->select('id');
 
         $query = Task::query()
             ->whereIn('project_id', $projectIds)
-            ->with([
-                'project',
-                'assignedUser',
-            ]);
+            ->with(['project', 'users']);
 
         $status = $request->get('status');
 
-        if (
-            $status &&
-            in_array(
-                $status,
-                ['todo', 'in_progress', 'review', 'done'],
-                true
-            )
-        ) {
+        if (in_array($status, ['todo', 'in_progress', 'review', 'done'], true)) {
             $query->where('status', $status);
+        } else {
+            $status = '';
         }
 
-        if ($request->filled('priority')) {
-            $query->where('priority', $request->priority);
+        if (in_array($request->get('priority'), ['low', 'medium', 'high'], true)) {
+            $query->where('priority', $request->get('priority'));
         }
 
         $tasks = $query
@@ -250,27 +120,365 @@ class TaskController extends Controller
         return view('tasks.index', compact('tasks', 'status'));
     }
 
-    
-    public function show(Task $task): \Illuminate\Contracts\View\View
+    public function create(): View
+    {
+        $projects = Project::query()
+            ->where(function ($query) {
+                $query->where('owner_id', auth()->id())
+                    ->orWhereHas('members', function ($query) {
+                        $query->where('users.id', auth()->id());
+                    });
+            })
+            ->with(['members', 'owner'])
+            ->orderBy('name')
+            ->get();
+
+        return view('tasks.create', compact('projects'));
+    }
+
+    public function storeMultiple(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'project_id' => ['required', 'integer', 'exists:projects,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'status' => ['required', 'in:todo,in_progress,review,done'],
+            'priority' => ['nullable', 'in:low,medium,high'],
+            'due_date' => ['nullable', 'date_format:Y-m-d'],
+            'assigned_user_ids' => ['nullable', 'array'],
+            'assigned_user_ids.*' => ['integer', 'distinct', 'exists:users,id'],
+        ]);
+
+        $project = Project::query()
+            ->whereKey($validated['project_id'])
+            ->where(function ($query) {
+                $query->where('owner_id', auth()->id())
+                    ->orWhereHas('members', function ($query) {
+                        $query->where('users.id', auth()->id());
+                    });
+            })
+            ->with(['members', 'owner'])
+            ->firstOrFail();
+
+        $this->authorize('create', $project);
+
+        $assigneeIds = $this->validateTaskAssignees(
+            $project,
+            $validated['assigned_user_ids'] ?? []
+        );
+
+        [$task, $newAssigneeIds] = DB::transaction(function () use (
+            $project,
+            $validated,
+            $assigneeIds
+        ) {
+            $task = $project->tasks()->create([
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+                'status' => $validated['status'],
+                'priority' => $validated['priority'] ?? 'medium',
+                'due_date' => $validated['due_date'] ?? null,
+                'assigned_to' => $assigneeIds[0] ?? null,
+            ]);
+
+            $newAssigneeIds = $this->syncTaskAssignees($task, $assigneeIds);
+
+            $statusLabels = [
+                'todo' => 'انجام نشده',
+                'in_progress' => 'در حال انجام',
+                'review' => 'بازبینی',
+                'done' => 'انجام‌شده',
+            ];
+
+            ProjectActivityLogger::log(
+                $project,
+                'task.created',
+                'ایجاد شد "' . $task->title . '"',
+                $task,
+                ['status' => $statusLabels[$task->status]]
+            );
+
+            return [$task, $newAssigneeIds];
+        });
+
+        $this->notifyNewAssignees($task, $newAssigneeIds);
+
+        return redirect()
+            ->route('tasks.show', $task)
+            ->with('success', 'وظیفه با موفقیت ایجاد شد.');
+    }
+
+    public function store(
+        StoreTaskRequest $request,
+        Project $project
+    ): RedirectResponse {
+        $this->authorize('create', $project);
+
+        $data = $request->validated();
+
+        $project->loadMissing(['members', 'owner']);
+
+        $assigneeIds = $this->validateTaskAssignees(
+            $project,
+            $data['assigned_user_ids'] ?? []
+        );
+
+        [$task, $newAssigneeIds] = DB::transaction(function () use (
+            $project,
+            $data,
+            $assigneeIds
+        ) {
+            $task = $project->tasks()->create([
+                'title' => $data['title'],
+                'description' => $data['description'] ?? null,
+                'status' => $data['status'],
+                'priority' => $data['priority'] ?? 'medium',
+                'due_date' => $data['due_date'] ?? null,
+                'assigned_to' => $assigneeIds[0] ?? null,
+            ]);
+
+            $newAssigneeIds = $this->syncTaskAssignees($task, $assigneeIds);
+
+            $statusLabels = [
+                'todo' => 'انجام نشده',
+                'in_progress' => 'در حال انجام',
+                'review' => 'بازبینی',
+                'done' => 'انجام‌شده',
+            ];
+
+            ProjectActivityLogger::log(
+                $project,
+                'task.created',
+                'ایجاد شد "' . $task->title . '"',
+                $task,
+                ['status' => $statusLabels[$task->status]]
+            );
+
+            return [$task, $newAssigneeIds];
+        });
+
+        $this->notifyNewAssignees($task, $newAssigneeIds);
+
+        return back()->with('success', 'وظیفه با موفقیت ایجاد شد.');
+    }
+
+    public function edit(Project $project, Task $task): View
+    {
+        abort_if($task->project_id !== $project->id, 404);
+
+        $this->authorize('update', $task);
+
+        $project->load(['members', 'owner']);
+
+        $users = $project->members
+            ->push($project->owner)
+            ->filter()
+            ->unique('id')
+            ->reject(fn ($user) => (int) $user->id === (int) auth()->id())
+            ->sortBy('name')
+            ->values();
+
+        $task->load('users');
+
+        return view('tasks.edit', compact('task', 'project', 'users'));
+    }
+
+    public function update(
+        UpdateTaskRequest $request,
+        Project $project,
+        Task $task
+    ): RedirectResponse {
+        abort_if($task->project_id !== $project->id, 404);
+
+        $this->authorize('update', $task);
+
+        $data = $request->validated();
+
+        $project->loadMissing(['members', 'owner']);
+
+        $assigneeIds = $this->validateTaskAssignees(
+            $project,
+            $data['assigned_user_ids'] ?? []
+        );
+
+        $oldStatus = $task->status;
+
+        $oldAssigneeIds = $task->users()
+            ->pluck('users.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        [$newAssigneeIds] = DB::transaction(function () use (
+            $task,
+            $data,
+            $assigneeIds,
+            $project,
+            $oldStatus,
+            $oldAssigneeIds
+        ) {
+            $task->update([
+                'title' => $data['title'],
+                'description' => $data['description'] ?? null,
+                'status' => $data['status'],
+                'priority' => $data['priority'] ?? 'medium',
+                'due_date' => $data['due_date'] ?? null,
+            ]);
+
+            $newAssigneeIds = $this->syncTaskAssignees($task, $assigneeIds);
+
+            $statusLabels = [
+                'todo' => 'انجام نشده',
+                'in_progress' => 'در حال انجام',
+                'review' => 'بازبینی',
+                'done' => 'انجام‌شده',
+            ];
+
+            ProjectActivityLogger::log(
+                $project,
+                'task.updated',
+                'به‌روزرسانی شد "' . $task->title . '"',
+                $task,
+                [
+                    'old_status' => $statusLabels[$oldStatus] ?? $oldStatus,
+                    'new_status' => $statusLabels[$task->status] ?? $task->status,
+                ]
+            );
+
+            if ($oldAssigneeIds !== $assigneeIds) {
+                ProjectActivityLogger::log(
+                    $project,
+                    'task.assigned',
+                    'مسئولین وظیفه "' . $task->title . '" تغییر کردند.',
+                    $task
+                );
+            }
+
+            return [$newAssigneeIds];
+        });
+
+        $task->refresh();
+
+        $this->notifyNewAssignees($task, $newAssigneeIds);
+
+        return back()->with('success', 'وظیفه با موفقیت ایجاد شد.');
+    }
+
+    public function updateStatus(
+        Request $request,
+        Task $task
+    ): RedirectResponse|JsonResponse {
+        $this->authorize('update', $task);
+
+        $validated = $request->validate([
+            'status' => ['required', 'in:todo,in_progress,review,done'],
+        ]);
+
+        $oldStatus = $task->status;
+
+        $statusLabels = [
+            'todo' => 'انجام نشده',
+            'in_progress' => 'در حال انجام',
+            'review' => 'بازبینی',
+            'done' => 'انجام‌شده',
+        ];
+
+        $oldStatusLabel = $statusLabels[$oldStatus] ?? $oldStatus;
+        $newStatusLabel = $statusLabels[$validated['status']];
+
+        $task->update([
+            'status' => $validated['status'],
+        ]);
+
+        if ($oldStatus !== $validated['status']) {
+            $task->loadMissing([
+                'project.members',
+                'project.owner',
+            ]);
+
+            ProjectActivityLogger::log(
+                $task->project,
+                'task.status_changed',
+                'انتقال یافت "' . $task->title . '" از ' .
+                    $oldStatusLabel . ' به ' . $newStatusLabel,
+                $task,
+                [
+                    'old_status' => $oldStatusLabel,
+                    'new_status' => $newStatusLabel,
+                ]
+            );
+
+            $recipients = $task->project->members
+                ->push($task->project->owner)
+                ->unique('id')
+                ->reject(
+                    fn ($user) => (int) $user->id === (int) auth()->id()
+                )
+                ->values();
+
+            Notification::send(
+                $recipients,
+                new TaskStatusChangedNotification(
+                    $task->fresh(),
+                    $oldStatusLabel,
+                    $newStatusLabel
+                )
+            );
+        }
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'status' => $task->status,
+            ]);
+        }
+
+        return back()->with('success', 'وضعیت وظیفه با موفقیت تغییر کرد.');
+    }
+
+    public function show(Task $task): View
     {
         $this->authorize('view', $task);
 
         $task->load([
             'project.owner',
             'project.members',
-            'assignedUser',
+            'users',
+            'messages.user',
+            'messages.attachments',
         ]);
 
         $messages = $task->messages()
-            ->with([
-                'user',
-                'attachments',
-            ])
-            ->orderBy('created_at', 'asc')
-            ->orderBy('id', 'asc')
+            ->with(['user', 'attachments'])
+            ->orderBy('created_at')
+            ->orderBy('id')
             ->get();
 
         return view('tasks.show', compact('task', 'messages'));
     }
 
+    public function destroy(Project $project, Task $task): RedirectResponse
+    {
+        abort_if($task->project_id !== $project->id, 404);
+
+        $this->authorize('delete', $task);
+
+        $title = $task->title;
+
+        DB::transaction(function () use ($task, $project, $title) {
+            $task->delete();
+
+            ProjectActivityLogger::log(
+                $project,
+                'task.deleted',
+                'حذف شد "' . $title . '"'
+            );
+        });
+
+        return redirect()
+            ->route('projects.show', [
+                'project' => $project,
+                'tab' => 'tasks',
+            ])
+            ->with('success', 'وظیفه با موفقیت حذف شد.');
+    }
 }

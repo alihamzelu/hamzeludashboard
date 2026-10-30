@@ -284,187 +284,354 @@
 
   {{-- ===================== TASKS ===================== --}}
   @if($tab === 'tasks')
+
   @php
-  $priorityLabels = [
-  'high' => 'بالا',
-  'medium' => 'متوسط',
-  'low' => 'پایین',
-  ];
+      $priorityLabels = [
+          'high' => 'بالا',
+          'medium' => 'متوسط',
+          'low' => 'پایین',
+      ];
+
+      $availableAssignees = collect([$project->owner])
+          ->merge($project->members)
+          ->filter()
+          ->unique('id')
+          ->reject(fn($user) => (int) $user->id === (int) auth()->id())
+          ->values();
   @endphp
+
   <div class="flex flex-col lg:flex-row gap-6 items-start">
-    <div class="flex-1 w-full">
-      <div class="bg-white rounded-2xl border border-slate-200 p-6">
-        <h2 class="text-lg font-semibold text-slate-900 mb-5">بورد وظایف</h2>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-          @foreach([
-          'todo' => 'انجام نشده',
-          'in_progress' => 'در حال انجام',
-          'review' => 'بازبینی',
-          'done' => 'انجام‌شده'
-          ] as $key => $label)
-          <div class="bg-gray-50 rounded-2xl p-4">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="font-semibold text-slate-900 text-sm">{{ $label }}</h3>
-              <span class="text-xs text-gray-400">{{ count($tasks[$key] ?? []) }}</span>
-            </div>
+      <div class="flex-1 w-full">
+          <div class="bg-white rounded-2xl border border-slate-200 p-6">
 
-            <div class="task-column space-y-3 min-h-[100px]" data-status="{{ $key }}">
-              @foreach($tasks[$key] ?? [] as $task)
-              <div class="task-card bg-white border border-slate-200 rounded-xl p-4 cursor-grab active:cursor-grabbing"
-                draggable="true" data-task-id="{{ $task->uid }}">
-                <h4 class="font-medium text-sm">{{ $task->title }}</h4>
-                @if($task->description)
-                <p class="text-xs text-gray-500 mt-2 line-clamp-2">{{ $task->description }}</p>
-                @endif
-                <div class="flex items-center justify-between mt-4">
-                  <span class="text-xs text-gray-500">{{ $priorityLabels[$task->priority] ?? $task->priority }}</span>
-                  <div class="flex items-center gap-2">
-                    @if($task->due_date)
-                    <span class="text-xs text-gray-400">{{ $task->due_date->format('Y/m/d') }}</span>
-                    @endif
-                    @can('update', $task)
-                    <button type="button" onclick="openEditModal(this)"
-                      data-id="{{ $task->uid }}"
-                      data-title="{{ e($task->title) }}"
-                      data-description="{{ e($task->description) }}"
-                      data-priority="{{ $task->priority }}"
-                      data-status="{{ $task->status }}"
-                      data-due="{{ $task->due_date?->format('Y-m-d') }}"
-                      data-assigned="{{ $task->assigned_to }}"
-                      data-can-delete="{{ auth()->user()->can('delete', $task) ? 'true' : 'false' }}"
-                      class="text-xs text-gray-400 hover:text-blue-600 transition">
-                      ویرایش
-                    </button>
-                    @endcan
-                  </div>
-                </div>
+              <h2 class="text-lg font-semibold text-slate-900 mb-5">
+                  بورد وظایف
+              </h2>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+
+                  @foreach([
+                      'todo' => 'انجام نشده',
+                      'in_progress' => 'در حال انجام',
+                      'review' => 'بازبینی',
+                      'done' => 'انجام‌شده'
+                  ] as $key => $label)
+
+                      <div class="bg-gray-50 rounded-2xl p-4">
+
+                          <div class="flex items-center justify-between mb-4">
+                              <h3 class="font-semibold text-slate-900 text-sm">
+                                  {{ $label }}
+                              </h3>
+
+                              <span class="text-xs text-gray-400">
+                                  {{ count($tasks[$key] ?? []) }}
+                              </span>
+                          </div>
+
+                          <div
+                              class="task-column space-y-3 min-h-[100px]"
+                              data-status="{{ $key }}"
+                          >
+
+                              @foreach($tasks[$key] ?? [] as $task)
+
+                                  <div
+                                      class="task-card bg-white border border-slate-200 rounded-xl p-4 cursor-grab active:cursor-grabbing"
+                                      draggable="true"
+                                      data-task-id="{{ $task->uid }}"
+                                  >
+
+                                      <h4 class="font-medium text-sm">
+                                          {{ $task->title }}
+                                      </h4>
+
+                                      @if($task->description)
+                                          <p class="text-xs text-gray-500 mt-2 line-clamp-2">
+                                              {{ $task->description }}
+                                          </p>
+                                      @endif
+
+                                      @if($task->users->isNotEmpty())
+                                          <div class="flex flex-wrap gap-1.5 mt-3">
+                                              @foreach($task->users as $user)
+                                                  <span class="inline-flex items-center gap-1 bg-blue-50 text-blue-700 rounded-lg px-2 py-1 text-xs">
+                                                      {{ $user->name }}
+                                                  </span>
+                                              @endforeach
+                                          </div>
+                                      @else
+                                          <p class="text-xs text-gray-400 mt-3">
+                                              بدون مسئول
+                                          </p>
+                                      @endif
+
+                                      <div class="flex items-center justify-between mt-4">
+
+                                          <span class="text-xs text-gray-500">
+                                              {{ $priorityLabels[$task->priority] ?? $task->priority }}
+                                          </span>
+
+                                          <div class="flex items-center gap-2">
+
+                                              @if($task->due_date)
+                                                  <span class="text-xs text-gray-400">
+                                                      {{ verta($task->due_date)->format('Y/m/d') }}
+                                                  </span>
+                                              @endif
+
+                                              @can('update', $task)
+                                                  <button
+                                                      type="button"
+                                                      onclick="openEditModal(this)"
+                                                      data-id="{{ $task->uid }}"
+                                                      data-title="{{ $task->title }}"
+                                                      data-description="{{ $task->description }}"
+                                                      data-priority="{{ $task->priority }}"
+                                                      data-status="{{ $task->status }}"
+                                                      data-date="{{ $task->due_date ? verta($task->due_date)->format('Y/m/d') : '' }}"
+                                                      data-gregorian="{{ $task->due_date?->format('Y-m-d') }}"
+                                                      data-assigned="{{ $task->users->pluck('id')->implode(',') }}"
+                                                      data-can-delete="{{ auth()->user()->can('delete', $task) ? 'true' : 'false' }}"
+                                                      class="text-xs text-gray-400 hover:text-blue-600 transition"
+                                                  >
+                                                      ویرایش
+                                                  </button>
+                                              @endcan
+
+                                          </div>
+                                      </div>
+
+                                  </div>
+
+                              @endforeach
+
+                          </div>
+                      </div>
+
+                  @endforeach
+
               </div>
-              @endforeach
-            </div>
           </div>
-          @endforeach
-        </div>
       </div>
-    </div>
 
-    <div class="w-full lg:w-80 flex-shrink-0">
-      @can('create', $project)
-      <div class="bg-white rounded-2xl border border-slate-200 p-6">
-        <h2 class="font-semibold text-slate-900 mb-4">افزودن وظیفه جدید</h2>
-        <form action="{{ route('projects.tasks.store', $project) }}" method="POST">
-          @csrf
-          <input type="hidden" name="status" value="todo">
-          <div class="flex flex-col gap-3">
-            <input type="text" name="title" value="{{ old('title') }}" placeholder="عنوان وظیفه" required
-              class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
-            <textarea name="description" rows="3" placeholder="توضیحات (اختیاری)"
-              class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-600">{{ old('description') }}</textarea>
-            <select name="priority" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
-              <option value="low" {{ old('priority') === 'low' ? 'selected' : '' }}>پایین</option>
-              <option value="medium" {{ old('priority', 'medium') === 'medium' ? 'selected' : '' }}>متوسط</option>
-              <option value="high" {{ old('priority') === 'high' ? 'selected' : '' }}>بالا</option>
-            </select>
-            {{-- تاریخ سررسید شمسی --}}
-            <div class="relative" data-jalali-picker>
+      {{-- افزودن وظیفه --}}
+      <div class="w-full lg:w-80 flex-shrink-0">
 
+          @can('create', $project)
 
-              <div class="relative">
-                <input
-                  id="due_date"
-                  type="text"
-                  name="due_date"
-                  readonly
-                  autocomplete="off"
-                  placeholder="انتخاب تاریخ سررسید"
-                  value="{{ old('due_date') }}"
-                  class="jalali-input w-full px-4 py-2.5 pl-10 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition cursor-pointer bg-white" />
+              <div class="bg-white rounded-2xl border border-slate-200 p-6">
 
-                <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7">
-                  <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
-                </svg>
+                  <h2 class="font-semibold text-slate-900 mb-4">
+                      افزودن وظیفه جدید
+                  </h2>
+
+                  <form action="{{ route('projects.tasks.store', $project) }}" method="POST">
+                      @csrf
+
+                      <input type="hidden" name="status" value="todo">
+
+                      <div class="flex flex-col gap-3">
+
+                          <input
+                              type="text"
+                              name="title"
+                              value="{{ old('title') }}"
+                              placeholder="عنوان وظیفه"
+                              required
+                              class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                          />
+
+                          <textarea
+                              name="description"
+                              rows="3"
+                              placeholder="توضیحات (اختیاری)"
+                              class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-600"
+                          >{{ old('description') }}</textarea>
+
+                          <select
+                              name="priority"
+                              class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
+                          >
+                              <option value="low" @selected(old('priority') === 'low')>
+                                  پایین
+                              </option>
+
+                              <option value="medium" @selected(old('priority', 'medium') === 'medium')>
+                                  متوسط
+                              </option>
+
+                              <option value="high" @selected(old('priority') === 'high')>
+                                  بالا
+                              </option>
+                          </select>
+
+                          {{-- تاریخ سررسید شمسی --}}
+                          <div class="relative" data-jalali-picker>
+
+                              <div class="relative">
+
+                                  <input
+                                      type="text"
+                                      name="due_date_jalali"
+                                      readonly
+                                      autocomplete="off"
+                                      placeholder="انتخاب تاریخ سررسید"
+                                      value="{{ old('due_date_jalali') }}"
+                                      class="jalali-input w-full px-4 py-2.5 pl-10 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition cursor-pointer bg-white"
+                                  />
+
+                                  <svg
+                                      class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      stroke-width="1.7"
+                                  >
+                                      <path
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+                                      />
+                                  </svg>
+
+                              </div>
+
+                              <input
+                                  type="hidden"
+                                  name="due_date_gregorian"
+                                  class="gregorian-value"
+                                  value="{{ old('due_date_gregorian') }}"
+                              />
+
+                              <div class="jalali-calendar hidden absolute z-50 top-full mt-2 right-0 w-80 max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+
+                                  <div class="flex items-center justify-between mb-4">
+
+                                      <button
+                                          type="button"
+                                          class="prev-month rounded-lg p-2 hover:bg-slate-100 text-slate-600"
+                                          aria-label="ماه قبل"
+                                      >
+                                          &#10095;
+                                      </button>
+
+                                      <div class="text-center">
+                                          <div class="calendar-title font-bold text-slate-800"></div>
+                                          <div class="text-xs text-slate-400 mt-1">
+                                              تقویم شمسی
+                                          </div>
+                                      </div>
+
+                                      <button
+                                          type="button"
+                                          class="next-month rounded-lg p-2 hover:bg-slate-100 text-slate-600"
+                                          aria-label="ماه بعد"
+                                      >
+                                          &#10094;
+                                      </button>
+
+                                  </div>
+
+                                  <div class="grid grid-cols-7 mb-2 text-center text-xs text-slate-400">
+                                      <div class="py-2">ش</div>
+                                      <div class="py-2">ی</div>
+                                      <div class="py-2">د</div>
+                                      <div class="py-2">س</div>
+                                      <div class="py-2">چ</div>
+                                      <div class="py-2">پ</div>
+                                      <div class="py-2">ج</div>
+                                  </div>
+
+                                  <div class="calendar-days grid grid-cols-7 gap-1"></div>
+
+                                  <div class="flex justify-between items-center border-t border-slate-100 mt-4 pt-3">
+
+                                      <button
+                                          type="button"
+                                          class="today-btn text-sm text-blue-600 hover:text-blue-800"
+                                      >
+                                          امروز
+                                      </button>
+
+                                      <button
+                                          type="button"
+                                          class="clear-date text-sm text-slate-500 hover:text-red-600"
+                                      >
+                                          پاک کردن
+                                      </button>
+
+                                  </div>
+                              </div>
+
+                              @error('due_date_gregorian')
+                                  <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
+                              @enderror
+
+                          </div>
+
+                          {{-- انتخاب چند مسئول --}}
+                          <div>
+
+                              <label class="block text-sm text-gray-600 mb-2">
+                                  مسئولین وظیفه
+                              </label>
+
+                              <div class="border border-slate-200 rounded-xl p-3 space-y-3 max-h-44 overflow-y-auto">
+
+                                  @forelse($availableAssignees as $member)
+
+                                      <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+
+                                          <input
+                                              type="checkbox"
+                                              name="assigned_user_ids[]"
+                                              value="{{ $member->id }}"
+                                              @checked(in_array($member->id, old('assigned_user_ids', [])))
+                                              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                          >
+
+                                          {{ $member->name }}
+
+                                      </label>
+
+                                  @empty
+
+                                      <p class="text-xs text-gray-400">
+                                          عضو دیگری برای انتخاب وجود ندارد.
+                                      </p>
+
+                                  @endforelse
+
+                              </div>
+
+                              @error('assigned_user_ids')
+                                  <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                              @enderror
+
+                          </div>
+
+                          <button
+                              type="submit"
+                              class="w-full bg-blue-600 text-white text-sm font-medium rounded-xl px-5 py-2.5 hover:bg-blue-700 transition"
+                          >
+                              افزودن وظیفه
+                          </button>
+
+                      </div>
+                  </form>
+
               </div>
 
-              <input
-                type="hidden"
-                name="due_date_gregorian"
-                class="gregorian-value"
-                value="{{ old('due_date') }}" />
+          @endcan
 
-              <div class="jalali-calendar hidden absolute z-50 top-full mt-2 right-0 w-80 max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
-                <div class="flex items-center justify-between mb-4">
-                  <button type="button"
-                    class="prev-month rounded-lg p-2 hover:bg-slate-100 text-slate-600"
-                    aria-label="ماه قبل">
-                    &#10095;
-                  </button>
-
-                  <div class="text-center">
-                    <div class="calendar-title font-bold text-slate-800"></div>
-                    <div class="text-xs text-slate-400 mt-1">تقویم شمسی</div>
-                  </div>
-
-                  <button type="button"
-                    class="next-month rounded-lg p-2 hover:bg-slate-100 text-slate-600"
-                    aria-label="ماه بعد">
-                    &#10094;
-                  </button>
-                </div>
-
-                <div class="grid grid-cols-7 mb-2 text-center text-xs text-slate-400">
-                  <div class="py-2">ش</div>
-                  <div class="py-2">ی</div>
-                  <div class="py-2">د</div>
-                  <div class="py-2">س</div>
-                  <div class="py-2">چ</div>
-                  <div class="py-2">پ</div>
-                  <div class="py-2">ج</div>
-                </div>
-
-                <div class="calendar-days grid grid-cols-7 gap-1"></div>
-
-                <div class="flex justify-between items-center border-t border-slate-100 mt-4 pt-3">
-                  <button type="button"
-                    class="today-btn text-sm text-blue-600 hover:text-blue-800">
-                    امروز
-                  </button>
-
-                  <button type="button"
-                    class="clear-date text-sm text-slate-500 hover:text-red-600">
-                    پاک کردن
-                  </button>
-                </div>
-              </div>
-
-              @error('due_date')
-              <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
-              @enderror
-            </div>
-            <select name="assigned_to" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
-              <option value="{{ auth()->id() }}" @selected(old('assigned_to', auth()->id()) == auth()->id())>
-                من ({{ auth()->user()->name }})
-              </option>
-              @foreach($project->members as $member)
-              @if($member->id !== auth()->id())
-              <option value="{{ $member->id }}" @selected(old('assigned_to')==$member->id)>
-                {{ $member->name }}
-              </option>
-              @endif
-              @endforeach
-            </select>
-            <button type="submit"
-              class="w-full bg-blue-600 text-white text-sm font-medium rounded-xl px-5 py-2.5 hover:bg-blue-700 transition">
-              افزودن وظیفه
-            </button>
-          </div>
-        </form>
       </div>
-      @endcan
-    </div>
+
   </div>
+
   @endif
+
 
   {{-- ===================== MEMBERS ===================== --}}
   @if($tab === 'members')
@@ -943,764 +1110,1218 @@
 
   {{-- ===================== SETTINGS ===================== --}}
   
-@if($tab === 'settings')
-  @php
-    $statusOptionLabels = [
-      'planning' => 'برنامه‌ریزی',
-      'active'   => 'فعال',
-      'completed'=> 'تکمیل‌شده',
-      'archived' => 'آرشیو',
-    ];
-  @endphp
+  @if($tab === 'settings')
+    @php
+      $statusOptionLabels = [
+        'planning' => 'برنامه‌ریزی',
+        'active'   => 'فعال',
+        'completed'=> 'تکمیل‌شده',
+        'archived' => 'آرشیو',
+      ];
+    @endphp
 
-  @if (auth()->user()->can('edit', $project))
-    <div class="max-w-2xl space-y-6">
-      <!-- بخش عمومی -->
-      <div class="bg-white rounded-2xl border border-slate-200 p-6">
-        <h2 class="text-lg font-semibold text-slate-900 mb-1">عمومی</h2>
-        <p class="text-sm text-gray-500 mb-6">جزئیات پروژه را به‌روز کنید</p>
+    @if (auth()->user()->can('edit', $project))
+      <div class="max-w-2xl space-y-6">
+        <!-- بخش عمومی -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6">
+          <h2 class="text-lg font-semibold text-slate-900 mb-1">عمومی</h2>
+          <p class="text-sm text-gray-500 mb-6">جزئیات پروژه را به‌روز کنید</p>
 
-        <form action="{{ route('projects.update', $project) }}" method="POST" class="space-y-4">
-          @csrf
-          @method('PUT')
+          <form action="{{ route('projects.update', $project) }}" method="POST" class="space-y-4">
+            @csrf
+            @method('PUT')
 
-          <div>
-            <label class="text-sm text-gray-600">نام</label>
-            <input type="text" name="name" value="{{ old('name', $project->name) }}" required
-              class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
-          </div>
-
-          <div>
-            <label class="text-sm text-gray-600">توضیحات</label>
-            <textarea name="description" rows="3"
-              class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-600 focus:outline-none">{{ old('description', $project->description) }}</textarea>
-          </div>
-
-          <div>
-            <label class="text-sm text-gray-600">وضعیت</label>
-            <select name="status" class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
-              @foreach(['planning', 'active', 'completed', 'archived'] as $s)
-                <option value="{{ $s }}" @selected(old('status', $project->status) === $s)>
-                  {{ $statusOptionLabels[$s] }}
-                </option>
-              @endforeach
-            </select>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3">
-            {{-- تاریخ شروع --}}
-            <div class="relative" dir="rtl" data-jalali-picker>
-              <label class="block text-sm text-gray-600 mb-1">تاریخ شروع</label>
-
-              <input
-                type="text"
-                name="start_date_jalali"
-                class="jalali-input w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 cursor-pointer"
-                placeholder="انتخاب تاریخ شروع"
-                readonly
-                autocomplete="off"
-                value="{{ old('start_date_jalali', $project->start_date ? verta($project->start_date)->format('Y/m/d') : '') }}">
-
-              <input
-                type="hidden"
-                name="start_date"
-                class="gregorian-value"
-                value="{{ old('start_date', $project->start_date?->format('Y-m-d')) }}">
-
-              <div class="jalali-calendar hidden absolute z-50 top-full mt-2 right-0 w-80 max-w-[90vw] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
-                <div class="flex items-center justify-between mb-4">
-                  <button type="button" class="prev-month rounded-lg p-2 hover:bg-gray-100 text-gray-600">&#10095;</button>
-                  <div class="text-center">
-                    <div class="calendar-title font-bold text-gray-800"></div>
-                    <div class="text-xs text-gray-400 mt-1">تقویم شمسی</div>
-                  </div>
-                  <button type="button" class="next-month rounded-lg p-2 hover:bg-gray-100 text-gray-600">&#10094;</button>
-                </div>
-
-                <div class="grid grid-cols-7 mb-2 text-center text-xs text-gray-400">
-                  <div class="py-2">ش</div>
-                  <div class="py-2">ی</div>
-                  <div class="py-2">د</div>
-                  <div class="py-2">س</div>
-                  <div class="py-2">چ</div>
-                  <div class="py-2">پ</div>
-                  <div class="py-2">ج</div>
-                </div>
-
-                <div class="calendar-days grid grid-cols-7 gap-1"></div>
-
-                <div class="flex justify-between items-center border-t mt-4 pt-3">
-                  <button type="button" class="today-btn text-sm text-blue-600 hover:text-blue-800">امروز</button>
-                  <button type="button" class="clear-date text-sm text-gray-500 hover:text-red-600">پاک کردن</button>
-                </div>
-              </div>
-
-              @error('start_date') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
-            </div>
-
-            {{-- تاریخ پایان --}}
-            <div class="relative" dir="rtl" data-jalali-picker>
-              <label class="block text-sm text-gray-600 mb-1">تاریخ پایان</label>
-
-              <input
-                type="text"
-                name="end_date_jalali"
-                class="jalali-input w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 cursor-pointer"
-                placeholder="انتخاب تاریخ پایان"
-                readonly
-                autocomplete="off"
-                value="{{ old('end_date_jalali', $project->end_date ? verta($project->end_date)->format('Y/m/d') : '') }}">
-
-              <input
-                type="hidden"
-                name="end_date"
-                class="gregorian-value"
-                value="{{ old('end_date', $project->end_date?->format('Y-m-d')) }}">
-
-              <div class="jalali-calendar hidden absolute z-50 top-full mt-2 right-0 w-80 max-w-[90vw] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
-                <div class="flex items-center justify-between mb-4">
-                  <button type="button" class="prev-month rounded-lg p-2 hover:bg-gray-100 text-gray-600">&#10095;</button>
-                  <div class="text-center">
-                    <div class="calendar-title font-bold text-gray-800"></div>
-                    <div class="text-xs text-gray-400 mt-1">تقویم شمسی</div>
-                  </div>
-                  <button type="button" class="next-month rounded-lg p-2 hover:bg-gray-100 text-gray-600">&#10094;</button>
-                </div>
-
-                <div class="grid grid-cols-7 mb-2 text-center text-xs text-gray-400">
-                  <div class="py-2">ش</div>
-                  <div class="py-2">ی</div>
-                  <div class="py-2">د</div>
-                  <div class="py-2">س</div>
-                  <div class="py-2">چ</div>
-                  <div class="py-2">پ</div>
-                  <div class="py-2">ج</div>
-                </div>
-
-                <div class="calendar-days grid grid-cols-7 gap-1"></div>
-
-                <div class="flex justify-between items-center border-t mt-4 pt-3">
-                  <button type="button" class="today-btn text-sm text-blue-600 hover:text-blue-800">امروز</button>
-                  <button type="button" class="clear-date text-sm text-gray-500 hover:text-red-600">پاک کردن</button>
-                </div>
-              </div>
-
-              @error('end_date') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
-            </div>
-          </div>
-
-          <button type="submit"
-            class="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition">
-            ذخیره تغییرات
-          </button>
-        </form>
-      </div>
-
-      <!-- منطقه خطر -->
-      @can('delete', $project)
-      <div class="bg-white rounded-2xl border border-red-200 p-6">
-        <h2 class="text-lg font-semibold text-red-600 mb-1">
-          منطقه خطر
-        </h2>
-
-        <p class="text-sm text-gray-500 mb-4">
-          این پروژه و همه وظایف آن برای همیشه حذف می‌شوند.
-        </p>
-
-        <form method="POST"
-          action="{{ route('projects.destroy', $project) }}"
-          onsubmit="return confirm('این پروژه برای همیشه حذف شود؟')">
-          @csrf
-          @method('DELETE')
-
-          <button type="submit"
-            class="px-5 py-2.5 border border-red-200 text-red-600 text-sm font-medium rounded-xl hover:bg-red-50 transition">
-            حذف پروژه
-          </button>
-        </form>
-      </div>
-      @endcan
-    </div>
-  @else
-    <!-- حالت قفل برای کاربرانی که دسترسی ندارند -->
-    <div class="max-w-2xl">
-      <div class="bg-white rounded-2xl border border-amber-200 p-8 text-center">
-        <div class="mx-auto w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-4xl mb-6">🔒</div>
-        <h3 class="text-xl font-semibold text-slate-900 mb-2">دسترسی محدود</h3>
-        <p class="text-gray-500 max-w-sm mx-auto leading-relaxed">
-          متأسفانه شما مجوز ویرایش یا حذف این پروژه را ندارید.
-        </p>
-        <div class="mt-8 text-xs text-gray-400">لطفاً با ادمین پروژه یا صاحب آن تماس بگیرید</div>
-      </div>
-    </div>
-  @endif
-@endif
-
-  {{-- ===================== EDIT TASK MODAL ===================== --}}
-  <div id="editTaskModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-blue-600/50 transition-opacity duration-300 opacity-0">
-    <div id="modalContainer"
-      class="bg-white rounded-2xl w-full max-w-lg p-6 mx-4 max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-95 opacity-0">
-
-      <div id="editModalMainContent">
-        <div class="flex items-center justify-between mb-5">
-          <h2 class="text-lg font-semibold text-slate-900">ویرایش وظیفه</h2>
-          <button type="button" onclick="closeEditModal()" class="text-gray-400 hover:text-blue-600 text-xl">✕</button>
-        </div>
-
-        @if ($errors->any() && old('_task_id'))
-        <div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4">
-          <ul class="list-disc list-inside text-sm text-red-600">
-            @foreach ($errors->all() as $error)
-            <li>{{ $error }}</li>
-            @endforeach
-          </ul>
-        </div>
-        @endif
-
-        <form
-          action="{{ $errors->any() && old('_task_id') ? route('projects.tasks.update', [$project, old('_task_id')]) : '' }}"
-          id="editTaskForm"
-          method="POST">
-          @csrf
-          @method('PUT')
-          <input type="hidden" name="_task_id" id="editTaskId" value="{{ old('_task_id') }}">
-
-          <div class="space-y-4">
             <div>
-              <label class="text-sm text-gray-600">عنوان</label>
-              <input id="editTitle" name="title" type="text" value="{{ old('title') }}"
+              <label class="text-sm text-gray-600">نام</label>
+              <input type="text" name="name" value="{{ old('name', $project->name) }}" required
                 class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none">
             </div>
 
             <div>
               <label class="text-sm text-gray-600">توضیحات</label>
-              <textarea id="editDescription" name="description" rows="3"
-                class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-600 focus:outline-none">{{ old('description') }}</textarea>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="text-sm text-gray-600">اولویت</label>
-                <select id="editPriority" name="priority" class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
-                  <option value="low" {{ old('priority') === 'low' ? 'selected' : '' }}>پایین</option>
-                  <option value="medium" {{ old('priority') === 'medium' ? 'selected' : '' }}>متوسط</option>
-                  <option value="high" {{ old('priority') === 'high' ? 'selected' : '' }}>بالا</option>
-                </select>
-              </div>
-              <div>
-                <label class="text-sm text-gray-600">وضعیت</label>
-                <select id="editStatus" name="status" class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
-                  <option value="todo" {{ old('status') === 'todo' ? 'selected' : '' }}>انجام نشده</option>
-                  <option value="in_progress" {{ old('status') === 'in_progress' ? 'selected' : '' }}>در حال انجام</option>
-                  <option value="review" {{ old('status') === 'review' ? 'selected' : '' }}>بازبینی</option>
-                  <option value="done" {{ old('status') === 'done' ? 'selected' : '' }}>انجام‌شده</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="relative" dir="rtl" data-jalali-picker>
-              <label for="editJalaliDate" class="block text-sm text-gray-600 mb-1">تاریخ سررسید</label>
-
-              <div class="relative">
-                <input
-                  id="editJalaliDate"
-                  type="text"
-                  name="due_date"
-                  readonly
-                  autocomplete="off"
-                  placeholder="انتخاب تاریخ سررسید"
-                  value="{{ old('due_date') }}"
-                  class="jalali-input w-full px-4 py-2.5 pl-10 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition cursor-pointer bg-white" />
-
-                <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7">
-                  <path stroke-linecap="round" stroke-linejoin="round"
-                    d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
-                </svg>
-              </div>
-
-              <input type="hidden" id="editStartDateGregorian" name="due_date_gregorian" class="gregorian-value" value="{{ old('due_date') }}" />
-
-              <div class="jalali-calendar hidden absolute z-50 top-full mt-2 right-0 w-80 max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
-                <div class="flex items-center justify-between mb-4">
-                  <button type="button" class="prev-month rounded-lg p-2 hover:bg-slate-100 text-slate-600">&#10095;</button>
-                  <div class="text-center">
-                    <div class="calendar-title font-bold text-slate-800"></div>
-                    <div class="text-xs text-slate-400 mt-1">تقویم شمسی</div>
-                  </div>
-                  <button type="button" class="next-month rounded-lg p-2 hover:bg-slate-100 text-slate-600">&#10094;</button>
-                </div>
-
-                <div class="grid grid-cols-7 mb-2 text-center text-xs text-slate-400">
-                  <div class="py-2">ش</div>
-                  <div class="py-2">ی</div>
-                  <div class="py-2">د</div>
-                  <div class="py-2">س</div>
-                  <div class="py-2">چ</div>
-                  <div class="py-2">پ</div>
-                  <div class="py-2">ج</div>
-                </div>
-
-                <div class="calendar-days grid grid-cols-7 gap-1"></div>
-
-                <div class="flex justify-between items-center border-t border-slate-100 mt-4 pt-3">
-                  <button type="button" class="today-btn text-sm text-blue-600 hover:text-blue-800">امروز</button>
-                  <button type="button" class="clear-date text-sm text-slate-500 hover:text-red-600">پاک کردن</button>
-                </div>
-              </div>
-
-              @error('due_date')
-              <p class="text-sm text-red-600 mt-1">{{ $message }}</p>
-              @enderror
+              <textarea name="description" rows="3"
+                class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-600 focus:outline-none">{{ old('description', $project->description) }}</textarea>
             </div>
 
             <div>
-              <label class="text-sm text-gray-600">مسئول</label>
-              <select id="editAssigned" name="assigned_to"
-                class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
-                @foreach($project->members as $member)
-                <option value="{{ $member->id }}" @selected(old('assigned_to')==$member->id)>
-                  {{ $member->name }}
-                </option>
+              <label class="text-sm text-gray-600">وضعیت</label>
+              <select name="status" class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">
+                @foreach(['planning', 'active', 'completed', 'archived'] as $s)
+                  <option value="{{ $s }}" @selected(old('status', $project->status) === $s)>
+                    {{ $statusOptionLabels[$s] }}
+                  </option>
                 @endforeach
               </select>
             </div>
 
-            <div class="flex items-center justify-between pt-4">
-              {{-- دکمه حذف با جاوااسکریپت کنترل می‌شه --}}
-              <button type="button" id="deleteTaskBtn" onclick="showDeleteConfirmation()"
-                class="text-sm text-red-600 hover:text-red-700 font-medium transition hidden">
-                حذف
-              </button>
-              <div id="deletePlaceholder"></div>
+            <div class="grid grid-cols-2 gap-3">
+              {{-- تاریخ شروع --}}
+              <div class="relative" dir="rtl" data-jalali-picker>
+                <label class="block text-sm text-gray-600 mb-1">تاریخ شروع</label>
 
-              <div class="flex gap-3">
-                <button type="button" onclick="closeEditModal()"
-                  class="px-4 py-2 rounded-xl border border-slate-200 text-sm hover:bg-gray-50 transition">
-                  انصراف
-                </button>
-                <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 transition">
-                  ذخیره تغییرات
-                </button>
+                <input
+                  type="text"
+                  name="start_date_jalali"
+                  class="jalali-input w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 cursor-pointer"
+                  placeholder="انتخاب تاریخ شروع"
+                  readonly
+                  autocomplete="off"
+                  value="{{ old('start_date_jalali', $project->start_date ? verta($project->start_date)->format('Y/m/d') : '') }}">
+
+                <input
+                  type="hidden"
+                  name="start_date"
+                  class="gregorian-value"
+                  value="{{ old('start_date', $project->start_date?->format('Y-m-d')) }}">
+
+                <div class="jalali-calendar hidden absolute z-50 top-full mt-2 right-0 w-80 max-w-[90vw] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
+                  <div class="flex items-center justify-between mb-4">
+                    <button type="button" class="prev-month rounded-lg p-2 hover:bg-gray-100 text-gray-600">&#10095;</button>
+                    <div class="text-center">
+                      <div class="calendar-title font-bold text-gray-800"></div>
+                      <div class="text-xs text-gray-400 mt-1">تقویم شمسی</div>
+                    </div>
+                    <button type="button" class="next-month rounded-lg p-2 hover:bg-gray-100 text-gray-600">&#10094;</button>
+                  </div>
+
+                  <div class="grid grid-cols-7 mb-2 text-center text-xs text-gray-400">
+                    <div class="py-2">ش</div>
+                    <div class="py-2">ی</div>
+                    <div class="py-2">د</div>
+                    <div class="py-2">س</div>
+                    <div class="py-2">چ</div>
+                    <div class="py-2">پ</div>
+                    <div class="py-2">ج</div>
+                  </div>
+
+                  <div class="calendar-days grid grid-cols-7 gap-1"></div>
+
+                  <div class="flex justify-between items-center border-t mt-4 pt-3">
+                    <button type="button" class="today-btn text-sm text-blue-600 hover:text-blue-800">امروز</button>
+                    <button type="button" class="clear-date text-sm text-gray-500 hover:text-red-600">پاک کردن</button>
+                  </div>
+                </div>
+
+                @error('start_date') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
+              </div>
+
+              {{-- تاریخ پایان --}}
+              <div class="relative" dir="rtl" data-jalali-picker>
+                <label class="block text-sm text-gray-600 mb-1">تاریخ پایان</label>
+
+                <input
+                  type="text"
+                  name="end_date_jalali"
+                  class="jalali-input w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 cursor-pointer"
+                  placeholder="انتخاب تاریخ پایان"
+                  readonly
+                  autocomplete="off"
+                  value="{{ old('end_date_jalali', $project->end_date ? verta($project->end_date)->format('Y/m/d') : '') }}">
+
+                <input
+                  type="hidden"
+                  name="end_date"
+                  class="gregorian-value"
+                  value="{{ old('end_date', $project->end_date?->format('Y-m-d')) }}">
+
+                <div class="jalali-calendar hidden absolute z-50 top-full mt-2 right-0 w-80 max-w-[90vw] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
+                  <div class="flex items-center justify-between mb-4">
+                    <button type="button" class="prev-month rounded-lg p-2 hover:bg-gray-100 text-gray-600">&#10095;</button>
+                    <div class="text-center">
+                      <div class="calendar-title font-bold text-gray-800"></div>
+                      <div class="text-xs text-gray-400 mt-1">تقویم شمسی</div>
+                    </div>
+                    <button type="button" class="next-month rounded-lg p-2 hover:bg-gray-100 text-gray-600">&#10094;</button>
+                  </div>
+
+                  <div class="grid grid-cols-7 mb-2 text-center text-xs text-gray-400">
+                    <div class="py-2">ش</div>
+                    <div class="py-2">ی</div>
+                    <div class="py-2">د</div>
+                    <div class="py-2">س</div>
+                    <div class="py-2">چ</div>
+                    <div class="py-2">پ</div>
+                    <div class="py-2">ج</div>
+                  </div>
+
+                  <div class="calendar-days grid grid-cols-7 gap-1"></div>
+
+                  <div class="flex justify-between items-center border-t mt-4 pt-3">
+                    <button type="button" class="today-btn text-sm text-blue-600 hover:text-blue-800">امروز</button>
+                    <button type="button" class="clear-date text-sm text-gray-500 hover:text-red-600">پاک کردن</button>
+                  </div>
+                </div>
+
+                @error('end_date') <p class="text-sm text-red-600 mt-1">{{ $message }}</p> @enderror
               </div>
             </div>
-          </div>
-        </form>
-      </div>
 
-      <div id="deleteConfirmContent" class="hidden text-center py-4">
-        <div class="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 text-red-600 flex items-center justify-center mx-auto mb-3 text-lg font-bold">!</div>
-        <h3 class="text-base font-semibold text-slate-900 mb-1">این وظیفه حذف شود؟</h3>
-        <p class="text-sm text-gray-500 mb-6">این عمل قابل بازگشت نیست.</p>
-        <div class="flex justify-center gap-3">
-          <button type="button" onclick="hideDeleteConfirmation()"
-            class="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
-            انصراف
-          </button>
-          <button type="button" onclick="executeDelete()"
-            class="px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition">
-            حذف وظیفه
-          </button>
+            <button type="submit"
+              class="px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition">
+              ذخیره تغییرات
+            </button>
+          </form>
+        </div>
+
+        <!-- منطقه خطر -->
+        @can('delete', $project)
+        <div class="bg-white rounded-2xl border border-red-200 p-6">
+          <h2 class="text-lg font-semibold text-red-600 mb-1">
+            منطقه خطر
+          </h2>
+
+          <p class="text-sm text-gray-500 mb-4">
+            این پروژه و همه وظایف آن برای همیشه حذف می‌شوند.
+          </p>
+
+          <form method="POST"
+            action="{{ route('projects.destroy', $project) }}"
+            onsubmit="return confirm('این پروژه برای همیشه حذف شود؟')">
+            @csrf
+            @method('DELETE')
+
+            <button type="submit"
+              class="px-5 py-2.5 border border-red-200 text-red-600 text-sm font-medium rounded-xl hover:bg-red-50 transition">
+              حذف پروژه
+            </button>
+          </form>
+        </div>
+        @endcan
+      </div>
+    @else
+      <!-- حالت قفل برای کاربرانی که دسترسی ندارند -->
+      <div class="max-w-2xl">
+        <div class="bg-white rounded-2xl border border-amber-200 p-8 text-center">
+          <div class="mx-auto w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-4xl mb-6">🔒</div>
+          <h3 class="text-xl font-semibold text-slate-900 mb-2">دسترسی محدود</h3>
+          <p class="text-gray-500 max-w-sm mx-auto leading-relaxed">
+            متأسفانه شما مجوز ویرایش یا حذف این پروژه را ندارید.
+          </p>
+          <div class="mt-8 text-xs text-gray-400">لطفاً با ادمین پروژه یا صاحب آن تماس بگیرید</div>
         </div>
       </div>
+    @endif
+  @endif
+  @php
+      $availableAssignees = collect([$project->owner])
+          ->merge($project->members)
+          ->filter()
+          ->unique('id')
+          ->reject(fn($user) => (int) $user->id === (int) auth()->id())
+          ->values();
+  @endphp
+  {{-- ===================== EDIT TASK MODAL ===================== --}}
+  <div id="editTaskModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-blue-600/50 transition-opacity duration-300 opacity-0">
 
-      <form id="deleteTaskForm" method="POST" class="hidden"
-        action="{{ $errors->any() && old('_task_id') ? route('projects.tasks.destroy', [$project, old('_task_id')]) : '' }}">
-        @csrf
-        @method('DELETE')
-      </form>
-    </div>
+      <div
+          id="modalContainer"
+          class="bg-white rounded-2xl w-full max-w-lg p-6 mx-4 max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-95 opacity-0"
+      >
+
+          <div id="editModalMainContent">
+
+              <div class="flex items-center justify-between mb-5">
+
+                  <h2 class="text-lg font-semibold text-slate-900">
+                      ویرایش وظیفه
+                  </h2>
+
+                  <button
+                      type="button"
+                      onclick="closeEditModal()"
+                      class="text-gray-400 hover:text-blue-600 text-xl"
+                  >
+                      ✕
+                  </button>
+
+              </div>
+
+              @if($errors->any() && old('_task_id'))
+
+                  <div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4">
+                      <ul class="list-disc list-inside text-sm text-red-600">
+                          @foreach($errors->all() as $error)
+                              <li>{{ $error }}</li>
+                          @endforeach
+                      </ul>
+                  </div>
+
+              @endif
+
+              <form
+                  action="{{ $errors->any() && old('_task_id') ? route('projects.tasks.update', [$project, old('_task_id')]) : '' }}"
+                  id="editTaskForm"
+                  method="POST"
+              >
+
+                  @csrf
+                  @method('PUT')
+
+                  <input
+                      type="hidden"
+                      name="_task_id"
+                      id="editTaskId"
+                      value="{{ old('_task_id') }}"
+                  >
+
+                  <div class="space-y-4">
+
+                      <div>
+                          <label class="text-sm text-gray-600">
+                              عنوان
+                          </label>
+
+                          <input
+                              id="editTitle"
+                              name="title"
+                              type="text"
+                              value="{{ old('title') }}"
+                              required
+                              class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                          >
+                      </div>
+
+                      <div>
+                          <label class="text-sm text-gray-600">
+                              توضیحات
+                          </label>
+
+                          <textarea
+                              id="editDescription"
+                              name="description"
+                              rows="3"
+                              class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-600 focus:outline-none"
+                          >{{ old('description') }}</textarea>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-3">
+
+                          <div>
+                              <label class="text-sm text-gray-600">
+                                  اولویت
+                              </label>
+
+                              <select
+                                  id="editPriority"
+                                  name="priority"
+                                  class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
+                              >
+                                  <option value="low" @selected(old('priority') === 'low')>
+                                      پایین
+                                  </option>
+
+                                  <option value="medium" @selected(old('priority', 'medium') === 'medium')>
+                                      متوسط
+                                  </option>
+
+                                  <option value="high" @selected(old('priority') === 'high')>
+                                      بالا
+                                  </option>
+                              </select>
+                          </div>
+
+                          <div>
+                              <label class="text-sm text-gray-600">
+                                  وضعیت
+                              </label>
+
+                              <select
+                                  id="editStatus"
+                                  name="status"
+                                  class="w-full mt-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-white"
+                              >
+                                  <option value="todo" @selected(old('status') === 'todo')>
+                                      انجام نشده
+                                  </option>
+
+                                  <option value="in_progress" @selected(old('status') === 'in_progress')>
+                                      در حال انجام
+                                  </option>
+
+                                  <option value="review" @selected(old('status') === 'review')>
+                                      بازبینی
+                                  </option>
+
+                                  <option value="done" @selected(old('status') === 'done')>
+                                      انجام‌شده
+                                  </option>
+                              </select>
+                          </div>
+
+                      </div>
+
+                      {{-- تاریخ سررسید شمسی --}}
+                      <div
+                          class="relative"
+                          dir="rtl"
+                          data-jalali-picker
+                          id="editPickerRoot"
+                      >
+
+                          <label
+                              for="editJalaliDate"
+                              class="block text-sm text-gray-600 mb-1"
+                          >
+                              تاریخ سررسید
+                          </label>
+
+                          <div class="relative">
+
+                              <input
+                                  id="editJalaliDate"
+                                  type="text"
+                                  name="due_date_jalali"
+                                  readonly
+                                  autocomplete="off"
+                                  placeholder="انتخاب تاریخ سررسید"
+                                  value="{{ old('due_date_jalali') }}"
+                                  class="jalali-input w-full px-4 py-2.5 pl-10 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition cursor-pointer bg-white"
+                              />
+
+                              <svg
+                                  class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  stroke-width="1.7"
+                              >
+                                  <path
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+                                  />
+                              </svg>
+
+                          </div>
+
+                          <input
+                              type="hidden"
+                              id="editStartDateGregorian"
+                              name="due_date_gregorian"
+                              class="gregorian-value"
+                              value="{{ old('due_date_gregorian') }}"
+                          />
+
+                          <div class="jalali-calendar hidden absolute z-50 top-full mt-2 right-0 w-80 max-w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+
+                              <div class="flex items-center justify-between mb-4">
+
+                                  <button
+                                      type="button"
+                                      class="prev-month rounded-lg p-2 hover:bg-slate-100 text-slate-600"
+                                  >
+                                      &#10095;
+                                  </button>
+
+                                  <div class="text-center">
+                                      <div class="calendar-title font-bold text-slate-800"></div>
+                                      <div class="text-xs text-slate-400 mt-1">
+                                          تقویم شمسی
+                                      </div>
+                                  </div>
+
+                                  <button
+                                      type="button"
+                                      class="next-month rounded-lg p-2 hover:bg-slate-100 text-slate-600"
+                                  >
+                                      &#10094;
+                                  </button>
+
+                              </div>
+
+                              <div class="grid grid-cols-7 mb-2 text-center text-xs text-slate-400">
+                                  <div class="py-2">ش</div>
+                                  <div class="py-2">ی</div>
+                                  <div class="py-2">د</div>
+                                  <div class="py-2">س</div>
+                                  <div class="py-2">چ</div>
+                                  <div class="py-2">پ</div>
+                                  <div class="py-2">ج</div>
+                              </div>
+
+                              <div class="calendar-days grid grid-cols-7 gap-1"></div>
+
+                              <div class="flex justify-between items-center border-t border-slate-100 mt-4 pt-3">
+
+                                  <button
+                                      type="button"
+                                      class="today-btn text-sm text-blue-600 hover:text-blue-800"
+                                  >
+                                      امروز
+                                  </button>
+
+                                  <button
+                                      type="button"
+                                      class="clear-date text-sm text-slate-500 hover:text-red-600"
+                                  >
+                                      پاک کردن
+                                  </button>
+
+                              </div>
+
+                          </div>
+
+                      </div>
+
+                      {{-- مسئولین --}}
+                      <div>
+
+                          <label class="block text-sm text-gray-600 mb-2">
+                              مسئولین وظیفه
+                          </label>
+
+                          <div class="border border-slate-200 rounded-xl p-3 space-y-3 max-h-44 overflow-y-auto">
+
+                              @forelse($availableAssignees as $member)
+
+                                  <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+
+                                      <input
+                                          type="checkbox"
+                                          name="assigned_user_ids[]"
+                                          value="{{ $member->id }}"
+                                          class="edit-assignee-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                      >
+
+                                      {{ $member->name }}
+
+                                  </label>
+
+                              @empty
+
+                                  <p class="text-xs text-gray-400">
+                                      عضو دیگری برای انتخاب وجود ندارد.
+                                  </p>
+
+                              @endforelse
+
+                          </div>
+
+                      </div>
+
+                      <div class="flex items-center justify-between pt-4">
+
+                          <button
+                              type="button"
+                              id="deleteTaskBtn"
+                              onclick="showDeleteConfirmation()"
+                              class="text-sm text-red-600 hover:text-red-700 font-medium transition hidden"
+                          >
+                              حذف
+                          </button>
+
+                          <div id="deletePlaceholder"></div>
+
+                          <div class="flex gap-3">
+
+                              <button
+                                  type="button"
+                                  onclick="closeEditModal()"
+                                  class="px-4 py-2 rounded-xl border border-slate-200 text-sm hover:bg-gray-50 transition"
+                              >
+                                  انصراف
+                              </button>
+
+                              <button
+                                  type="submit"
+                                  class="px-5 py-2 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700 transition"
+                              >
+                                  ذخیره تغییرات
+                              </button>
+
+                          </div>
+
+                      </div>
+
+                  </div>
+
+              </form>
+
+          </div>
+
+          {{-- تایید حذف --}}
+          <div id="deleteConfirmContent" class="hidden text-center py-4">
+
+              <div class="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 text-red-600 flex items-center justify-center mx-auto mb-3 text-lg font-bold">
+                  !
+              </div>
+
+              <h3 class="text-base font-semibold text-slate-900 mb-1">
+                  این وظیفه حذف شود؟
+              </h3>
+
+              <p class="text-sm text-gray-500 mb-6">
+                  این عمل قابل بازگشت نیست.
+              </p>
+
+              <div class="flex justify-center gap-3">
+
+                  <button
+                      type="button"
+                      onclick="hideDeleteConfirmation()"
+                      class="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                  >
+                      انصراف
+                  </button>
+
+                  <button
+                      type="button"
+                      onclick="executeDelete()"
+                      class="px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition"
+                  >
+                      حذف وظیفه
+                  </button>
+
+              </div>
+
+          </div>
+
+          <form
+              id="deleteTaskForm"
+              method="POST"
+              class="hidden"
+              action="{{ $errors->any() && old('_task_id') ? route('projects.tasks.destroy', [$project, old('_task_id')]) : '' }}"
+          >
+              @csrf
+              @method('DELETE')
+          </form>
+
+      </div>
+
   </div>
 
+
+
   <script>
-    (() => {
+  (() => {
+
       const monthNames = [
-        'فروردین', 'اردیبهشت', 'خرداد', 'تیر',
-        'مرداد', 'شهریور', 'مهر', 'آبان',
-        'آذر', 'دی', 'بهمن', 'اسفند'
+          'فروردین', 'اردیبهشت', 'خرداد', 'تیر',
+          'مرداد', 'شهریور', 'مهر', 'آبان',
+          'آذر', 'دی', 'بهمن', 'اسفند'
       ];
 
       const pad = n => String(n).padStart(2, '0');
 
       function toJalali(gy, gm, gd) {
-        const gdm = [0, 31, ((gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        let jy = gy <= 1600 ? 0 : 979;
-        gy -= gy <= 1600 ? 621 : 1600;
-        const gy2 = gm > 2 ? gy + 1 : gy;
-        let days = 365 * gy + Math.floor((gy2 + 3) / 4) - Math.floor((gy2 + 99) / 100) + Math.floor((gy2 + 399) / 400) - 80 + gd;
-        for (let i = 0; i < gm; i++) days += gdm[i];
-        jy += 33 * Math.floor(days / 12053);
-        days %= 12053;
-        jy += 4 * Math.floor(days / 1461);
-        days %= 1461;
-        if (days > 365) {
-          jy += Math.floor((days - 1) / 365);
-          days = (days - 1) % 365;
-        }
-        const jm = days < 186 ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
-        const jd = 1 + (days < 186 ? days % 31 : (days - 186) % 30);
-        return [jy, jm, jd];
+          const gdm = [
+              0, 31,
+              ((gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0) ? 29 : 28,
+              31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+          ];
+
+          let jy = gy <= 1600 ? 0 : 979;
+          gy -= gy <= 1600 ? 621 : 1600;
+
+          const gy2 = gm > 2 ? gy + 1 : gy;
+
+          let days = 365 * gy
+              + Math.floor((gy2 + 3) / 4)
+              - Math.floor((gy2 + 99) / 100)
+              + Math.floor((gy2 + 399) / 400)
+              - 80 + gd;
+
+          for (let i = 0; i < gm; i++) {
+              days += gdm[i];
+          }
+
+          jy += 33 * Math.floor(days / 12053);
+          days %= 12053;
+
+          jy += 4 * Math.floor(days / 1461);
+          days %= 1461;
+
+          if (days > 365) {
+              jy += Math.floor((days - 1) / 365);
+              days = (days - 1) % 365;
+          }
+
+          const jm = days < 186
+              ? 1 + Math.floor(days / 31)
+              : 7 + Math.floor((days - 186) / 30);
+
+          const jd = 1 + (
+              days < 186
+                  ? days % 31
+                  : (days - 186) % 30
+          );
+
+          return [jy, jm, jd];
       }
 
       function toGregorian(jy, jm, jd) {
-        jy += 1595;
-        let days = -355668 + 365 * jy + Math.floor(jy / 33) * 8 + Math.floor(((jy % 33) + 3) / 4) + jd;
-        if (jm < 7) days += (jm - 1) * 31;
-        else days += (jm - 7) * 30 + 186;
-        let gy = 400 * Math.floor(days / 146097);
-        days %= 146097;
-        if (days > 36524) {
-          gy += 100 * Math.floor(--days / 36524);
-          days %= 36524;
-          if (days >= 365) days++;
-        }
-        gy += 4 * Math.floor(days / 1461);
-        days %= 1461;
-        if (days > 365) {
-          gy += Math.floor((days - 1) / 365);
-          days = (days - 1) % 365;
-        }
-        let gd = days + 1;
-        const leap = gy % 4 === 0 && (gy % 100 !== 0 || gy % 400 === 0);
-        const monthDays = [0, 31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        let gm = 1;
-        while (gm <= 12 && gd > monthDays[gm]) {
-          gd -= monthDays[gm];
-          gm++;
-        }
-        return [gy, gm, gd];
+          jy += 1595;
+
+          let days = -355668
+              + 365 * jy
+              + Math.floor(jy / 33) * 8
+              + Math.floor(((jy % 33) + 3) / 4)
+              + jd;
+
+          if (jm < 7) {
+              days += (jm - 1) * 31;
+          } else {
+              days += (jm - 7) * 30 + 186;
+          }
+
+          let gy = 400 * Math.floor(days / 146097);
+          days %= 146097;
+
+          if (days > 36524) {
+              gy += 100 * Math.floor(--days / 36524);
+              days %= 36524;
+
+              if (days >= 365) {
+                  days++;
+              }
+          }
+
+          gy += 4 * Math.floor(days / 1461);
+          days %= 1461;
+
+          if (days > 365) {
+              gy += Math.floor((days - 1) / 365);
+              days = (days - 1) % 365;
+          }
+
+          let gd = days + 1;
+
+          const leap = gy % 4 === 0 && (
+              gy % 100 !== 0 || gy % 400 === 0
+          );
+
+          const monthDays = [
+              0, 31, leap ? 29 : 28,
+              31, 30, 31, 30, 31, 31, 30, 31, 30, 31
+          ];
+
+          let gm = 1;
+
+          while (gm <= 12 && gd > monthDays[gm]) {
+              gd -= monthDays[gm];
+              gm++;
+          }
+
+          return [gy, gm, gd];
       }
 
       function monthLength(y, m) {
-        if (m <= 6) return 31;
-        if (m <= 11) return 30;
-        const next = toGregorian(y + 1, 1, 1);
-        const last = toJalali(next[0], next[1], next[2] - 1);
-        return last[2] === 30 ? 30 : 29;
+          if (m <= 6) return 31;
+          if (m <= 11) return 30;
+
+          const next = toGregorian(y + 1, 1, 1);
+          const last = toJalali(next[0], next[1], next[2] - 1);
+
+          return last[2] === 30 ? 30 : 29;
       }
 
       const today = new Date();
-      const currentJalali = toJalali(today.getFullYear(), today.getMonth() + 1, today.getDate());
+
+      const currentJalali = toJalali(
+          today.getFullYear(),
+          today.getMonth() + 1,
+          today.getDate()
+      );
 
       function parseJalali(str) {
-        const p = (str || '').split('/').map(Number);
-        return p.length === 3 && p.every(n => n > 0) ? p : null;
+          const p = (str || '').split('/').map(Number);
+
+          if (
+              p.length === 3 &&
+              p.every(n => n > 0) &&
+              p[1] <= 12 &&
+              p[2] <= monthLength(p[0], p[1])
+          ) {
+              return p;
+          }
+
+          return null;
       }
 
       function initPicker(root) {
-        if (root._jalali) return root._jalali;
-
-        const input = root.querySelector('.jalali-input');
-        const hiddenInput = root.querySelector('.gregorian-value');
-        const calendar = root.querySelector('.jalali-calendar');
-        const title = root.querySelector('.calendar-title');
-        const daysBox = root.querySelector('.calendar-days');
-        const prevBtn = root.querySelector('.prev-month');
-        const nextBtn = root.querySelector('.next-month');
-        const todayBtn = root.querySelector('.today-btn');
-        const clearBtn = root.querySelector('.clear-date');
-
-        if (!input || !hiddenInput || !calendar || !title || !daysBox) return null;
-
-        let year = currentJalali[0];
-        let month = currentJalali[1];
-        let selected = null;
-
-        function notifyChange() {
-          input.dispatchEvent(new Event('change', {
-            bubbles: true
-          }));
-        }
-
-        function render() {
-          title.textContent = `${monthNames[month - 1]} ${year}`;
-          daysBox.innerHTML = '';
-
-          const firstDay = toGregorian(year, month, 1);
-          const weekday = new Date(firstDay[0], firstDay[1] - 1, firstDay[2]).getDay();
-          const startOffset = (weekday + 1) % 7;
-          const count = monthLength(year, month);
-
-          for (let i = 0; i < startOffset; i++) {
-            daysBox.appendChild(document.createElement('div'));
+          if (root._jalali) {
+              return root._jalali;
           }
 
-          for (let day = 1; day <= count; day++) {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.textContent = day;
-            button.className = 'h-9 rounded-lg text-sm transition';
+          const input = root.querySelector('.jalali-input');
+          const hiddenInput = root.querySelector('.gregorian-value');
+          const calendar = root.querySelector('.jalali-calendar');
+          const title = root.querySelector('.calendar-title');
+          const daysBox = root.querySelector('.calendar-days');
 
-            const isSelected = selected && selected[0] === year && selected[1] === month && selected[2] === day;
-            const isToday = currentJalali[0] === year && currentJalali[1] === month && currentJalali[2] === day;
+          const prevBtn = root.querySelector('.prev-month');
+          const nextBtn = root.querySelector('.next-month');
+          const todayBtn = root.querySelector('.today-btn');
+          const clearBtn = root.querySelector('.clear-date');
 
-            if (isSelected) {
-              button.classList.add('bg-blue-600', 'text-white', 'font-bold');
-            } else {
-              button.classList.add('text-slate-700', 'hover:bg-blue-50');
-            }
-            if (isToday && !isSelected) {
-              button.classList.add('ring-1', 'ring-blue-500', 'text-blue-600');
-            }
-
-            button.addEventListener('click', () => setDate(year, month, day));
-            daysBox.appendChild(button);
+          if (!input || !hiddenInput || !calendar || !title || !daysBox) {
+              return null;
           }
-        }
 
-        function setDate(y, m, d) {
-          selected = [y, m, d];
-          year = y;
-          month = m;
+          let year = currentJalali[0];
+          let month = currentJalali[1];
+          let selected = null;
 
-          const g = toGregorian(y, m, d);
-          input.value = `${y}/${pad(m)}/${pad(d)}`;
-          hiddenInput.value = `${g[0]}-${pad(g[1])}-${pad(g[2])}`;
-
-          calendar.classList.add('hidden');
-          notifyChange();
-          render();
-        }
-
-        function clearDate() {
-          input.value = '';
-          hiddenInput.value = '';
-          selected = null;
-          year = currentJalali[0];
-          month = currentJalali[1];
-
-          calendar.classList.add('hidden');
-          notifyChange();
-          render();
-        }
-
-        function moveMonth(delta) {
-          month += delta;
-          if (month > 12) {
-            month = 1;
-            year++;
-          } else if (month < 1) {
-            month = 12;
-            year--;
+          function notifyChange() {
+              input.dispatchEvent(new Event('change', {
+                  bubbles: true
+              }));
           }
-          render();
-        }
 
-        // مقدار فعلی input را می‌خواند و تقویم را روی همان تاریخ می‌گذارد
-        function sync() {
-          const p = parseJalali(input.value);
-          if (p) {
-            selected = p;
-            year = p[0];
-            month = p[1];
-          } else {
-            selected = null;
-            year = currentJalali[0];
-            month = currentJalali[1];
+          function render() {
+              title.textContent = `${monthNames[month - 1]} ${year}`;
+              daysBox.innerHTML = '';
+
+              const firstDay = toGregorian(year, month, 1);
+
+              const weekday = new Date(
+                  firstDay[0],
+                  firstDay[1] - 1,
+                  firstDay[2]
+              ).getDay();
+
+              const startOffset = (weekday + 1) % 7;
+              const count = monthLength(year, month);
+
+              for (let i = 0; i < startOffset; i++) {
+                  daysBox.appendChild(document.createElement('div'));
+              }
+
+              for (let day = 1; day <= count; day++) {
+                  const button = document.createElement('button');
+
+                  button.type = 'button';
+                  button.textContent = day;
+                  button.className = 'h-9 rounded-lg text-sm transition';
+
+                  const isSelected = selected &&
+                      selected[0] === year &&
+                      selected[1] === month &&
+                      selected[2] === day;
+
+                  const isToday =
+                      currentJalali[0] === year &&
+                      currentJalali[1] === month &&
+                      currentJalali[2] === day;
+
+                  if (isSelected) {
+                      button.classList.add(
+                          'bg-blue-600',
+                          'text-white',
+                          'font-bold'
+                      );
+                  } else {
+                      button.classList.add(
+                          'text-slate-700',
+                          'hover:bg-blue-50'
+                      );
+                  }
+
+                  if (isToday && !isSelected) {
+                      button.classList.add(
+                          'ring-1',
+                          'ring-blue-500',
+                          'text-blue-600'
+                      );
+                  }
+
+                  button.addEventListener('click', () => {
+                      setDate(year, month, day);
+                  });
+
+                  daysBox.appendChild(button);
+              }
           }
-          render();
-        }
 
-        prevBtn?.addEventListener('click', () => moveMonth(-1));
-        nextBtn?.addEventListener('click', () => moveMonth(1));
-        todayBtn?.addEventListener('click', () => setDate(...currentJalali));
-        clearBtn?.addEventListener('click', clearDate);
+          function setDate(y, m, d) {
+              selected = [y, m, d];
+              year = y;
+              month = m;
 
-        input.addEventListener('click', (e) => {
-          e.stopPropagation();
-          document.querySelectorAll('.jalali-calendar').forEach(item => {
-            if (item !== calendar) item.classList.add('hidden');
+              const g = toGregorian(y, m, d);
+
+              input.value = `${y}/${pad(m)}/${pad(d)}`;
+
+              hiddenInput.value =
+                  `${g[0]}-${pad(g[1])}-${pad(g[2])}`;
+
+              calendar.classList.add('hidden');
+
+              notifyChange();
+              render();
+          }
+
+          function clearDate() {
+              input.value = '';
+              hiddenInput.value = '';
+              selected = null;
+
+              year = currentJalali[0];
+              month = currentJalali[1];
+
+              calendar.classList.add('hidden');
+
+              notifyChange();
+              render();
+          }
+
+          function moveMonth(delta) {
+              month += delta;
+
+              if (month > 12) {
+                  month = 1;
+                  year++;
+              } else if (month < 1) {
+                  month = 12;
+                  year--;
+              }
+
+              render();
+          }
+
+          function sync() {
+              const p = parseJalali(input.value);
+
+              if (p) {
+                  selected = p;
+                  year = p[0];
+                  month = p[1];
+              } else {
+                  selected = null;
+                  year = currentJalali[0];
+                  month = currentJalali[1];
+              }
+
+              render();
+          }
+
+          prevBtn?.addEventListener('click', () => moveMonth(-1));
+          nextBtn?.addEventListener('click', () => moveMonth(1));
+
+          todayBtn?.addEventListener('click', () => {
+              setDate(...currentJalali);
           });
-          calendar.classList.toggle('hidden');
-        });
 
-        root._jalali = {
-          sync,
-          setDate,
-          clearDate
-        };
-        sync();
-        return root._jalali;
+          clearBtn?.addEventListener('click', clearDate);
+
+          input.addEventListener('click', (e) => {
+              e.stopPropagation();
+
+              document.querySelectorAll('.jalali-calendar').forEach(item => {
+                  if (item !== calendar) {
+                      item.classList.add('hidden');
+                  }
+              });
+
+              calendar.classList.toggle('hidden');
+          });
+
+          root._jalali = {
+              sync,
+              setDate,
+              clearDate
+          };
+
+          sync();
+
+          return root._jalali;
       }
 
-      // راه‌اندازی همه تقویم‌ها (فرم ایجاد و مودال ویرایش)
+      // راه‌اندازی تقویم‌ها
       const pickers = document.querySelectorAll('[data-jalali-picker]');
+
       pickers.forEach(initPicker);
 
       document.addEventListener('click', (event) => {
-        pickers.forEach(root => {
-          if (!root.contains(event.target)) {
-            root.querySelector('.jalali-calendar')?.classList.add('hidden');
-          }
-        });
+          pickers.forEach(root => {
+              if (!root.contains(event.target)) {
+                  root.querySelector('.jalali-calendar')?.classList.add('hidden');
+              }
+          });
       });
 
-      // اعتبارسنجی: اگر تاریخ نمایش داده شده ولی مقدار میلادی خالی است، ارسال نشود
+      // اعتبارسنجی تاریخ
       document.querySelectorAll('form').forEach(form => {
-        form.addEventListener('submit', (event) => {
-          const formPickers = form.querySelectorAll('[data-jalali-picker]');
-          for (const root of formPickers) {
-            const input = root.querySelector('.jalali-input');
-            const hiddenInput = root.querySelector('.gregorian-value');
-            if (input && hiddenInput && input.value && !hiddenInput.value) {
-              event.preventDefault();
-              input.focus();
-              alert('لطفاً تاریخ را از تقویم انتخاب کنید.');
-              return;
-            }
-          }
-        });
+          form.addEventListener('submit', (event) => {
+              const formPickers = form.querySelectorAll('[data-jalali-picker]');
+
+              for (const root of formPickers) {
+                  const input = root.querySelector('.jalali-input');
+                  const hiddenInput = root.querySelector('.gregorian-value');
+
+                  if (input && hiddenInput && input.value && !hiddenInput.value) {
+                      event.preventDefault();
+                      input.focus();
+
+                      alert('لطفاً تاریخ را از تقویم انتخاب کنید.');
+
+                      return;
+                  }
+              }
+          });
       });
 
-      // ===== مودال ویرایش =====
+      // مودال ویرایش
       const modal = document.getElementById('editTaskModal');
       const container = document.getElementById('modalContainer');
       const editRoot = document.getElementById('editPickerRoot');
 
       window.openEditModal = function(button) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
 
-        setTimeout(() => {
-          modal.classList.remove('opacity-0');
-          container.classList.remove('scale-95', 'opacity-0');
-          container.classList.add('scale-100', 'opacity-100');
-        }, 10);
+          setTimeout(() => {
+              modal.classList.remove('opacity-0');
+              container.classList.remove('scale-95', 'opacity-0');
+              container.classList.add('scale-100', 'opacity-100');
+          }, 10);
 
-        hideDeleteConfirmation();
+          hideDeleteConfirmation();
 
-        document.getElementById('editTitle').value = button.dataset.title || '';
-        document.getElementById('editDescription').value = button.dataset.description || '';
-        document.getElementById('editPriority').value = button.dataset.priority || 'medium';
-        document.getElementById('editStatus').value = button.dataset.status || 'todo';
-        document.getElementById('editAssigned').value = button.dataset.assigned || '';
+          document.getElementById('editTitle').value =
+              button.dataset.title || '';
 
-        const taskId = button.dataset.id;
-        document.getElementById('editTaskId').value = taskId;
+          document.getElementById('editDescription').value =
+              button.dataset.description || '';
 
-        // مقدار تاریخ را در فیلدها می‌گذاریم و سپس تقویم را همگام می‌کنیم
-        document.getElementById('editJalaliDate').value = button.dataset.date || '';
-        document.getElementById('editStartDateGregorian').value = button.dataset.gregorian || '';
+          document.getElementById('editPriority').value =
+              button.dataset.priority || 'medium';
 
-        if (editRoot) {
-          const picker = initPicker(editRoot);
-          picker?.sync();
-        }
+          document.getElementById('editStatus').value =
+              button.dataset.status || 'todo';
 
-        const baseUrl = `/projects/${'{{ $project->slug ?? $project->id }}'}/tasks/${taskId}`;
-        document.getElementById('editTaskForm').action = baseUrl;
-        document.getElementById('deleteTaskForm').action = baseUrl;
+          const taskId = button.dataset.id;
 
-        const deleteBtn = document.getElementById('deleteTaskBtn');
-        const placeholder = document.getElementById('deletePlaceholder');
-        if (button.dataset.canDelete === 'true') {
-          deleteBtn.classList.remove('hidden');
-          placeholder.classList.add('hidden');
-        } else {
-          deleteBtn.classList.add('hidden');
-          placeholder.classList.remove('hidden');
-        }
+          document.getElementById('editTaskId').value = taskId;
+
+          // انتخاب مسئولین
+          const assignedIds = (button.dataset.assigned || '')
+              .split(',')
+              .filter(Boolean);
+
+          document.querySelectorAll('.edit-assignee-checkbox').forEach(checkbox => {
+              checkbox.checked = assignedIds.includes(checkbox.value);
+          });
+
+          // تنظیم تاریخ
+          document.getElementById('editJalaliDate').value =
+              button.dataset.date || '';
+
+          document.getElementById('editStartDateGregorian').value =
+              button.dataset.gregorian || '';
+
+          if (editRoot) {
+              const picker = initPicker(editRoot);
+              picker?.sync();
+          }
+
+          const projectIdentifier = @json($project->slug ?? $project->id);
+
+          const baseUrl =
+              `/projects/${encodeURIComponent(projectIdentifier)}/tasks/${encodeURIComponent(taskId)}`;
+
+          document.getElementById('editTaskForm').action = baseUrl;
+          document.getElementById('deleteTaskForm').action = baseUrl;
+
+          const deleteBtn = document.getElementById('deleteTaskBtn');
+          const placeholder = document.getElementById('deletePlaceholder');
+
+          if (button.dataset.canDelete === 'true') {
+              deleteBtn.classList.remove('hidden');
+              placeholder.classList.add('hidden');
+          } else {
+              deleteBtn.classList.add('hidden');
+              placeholder.classList.remove('hidden');
+          }
       };
 
       window.closeEditModal = function() {
-        modal.classList.add('opacity-0');
-        container.classList.remove('scale-100', 'opacity-100');
-        container.classList.add('scale-95', 'opacity-0');
-        setTimeout(() => {
-          modal.classList.remove('flex');
-          modal.classList.add('hidden');
-        }, 300);
+          modal.classList.add('opacity-0');
+
+          container.classList.remove('scale-100', 'opacity-100');
+          container.classList.add('scale-95', 'opacity-0');
+
+          setTimeout(() => {
+              modal.classList.remove('flex');
+              modal.classList.add('hidden');
+          }, 300);
       };
 
       window.showDeleteConfirmation = function() {
-        document.getElementById('editModalMainContent').classList.add('hidden');
-        document.getElementById('deleteConfirmContent').classList.remove('hidden');
+          document.getElementById('editModalMainContent').classList.add('hidden');
+          document.getElementById('deleteConfirmContent').classList.remove('hidden');
       };
 
       window.hideDeleteConfirmation = function() {
-        document.getElementById('deleteConfirmContent').classList.add('hidden');
-        document.getElementById('editModalMainContent').classList.remove('hidden');
+          document.getElementById('deleteConfirmContent').classList.add('hidden');
+          document.getElementById('editModalMainContent').classList.remove('hidden');
       };
 
       window.executeDelete = function() {
-        document.getElementById('deleteTaskForm').submit();
+          document.getElementById('deleteTaskForm').submit();
       };
 
-      @if($errors -> any() && old('_task_id'))
-      if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        setTimeout(() => {
-          modal.classList.remove('opacity-0');
-          container.classList.remove('scale-95', 'opacity-0');
-          container.classList.add('scale-100', 'opacity-100');
-        }, 10);
-      }
+      // باز شدن مجدد مودال بعد از خطای اعتبارسنجی
+      @if($errors->any() && old('_task_id'))
+
+          const oldTaskId = @json(old('_task_id'));
+
+          const oldButton = document.querySelector(
+              `.task-card [data-id="${CSS.escape(oldTaskId)}"]`
+          );
+
+          if (oldButton) {
+              openEditModal(oldButton);
+
+              document.getElementById('editTitle').value =
+                  @json(old('title'));
+
+              document.getElementById('editDescription').value =
+                  @json(old('description'));
+
+              document.getElementById('editPriority').value =
+                  @json(old('priority'));
+
+              document.getElementById('editStatus').value =
+                  @json(old('status'));
+
+              document.querySelectorAll('.edit-assignee-checkbox').forEach(checkbox => {
+                  checkbox.checked = @json(old('assigned_user_ids', []))
+                      .map(String)
+                      .includes(checkbox.value);
+              });
+
+              document.getElementById('editJalaliDate').value =
+                  @json(old('due_date_jalali'));
+
+              document.getElementById('editStartDateGregorian').value =
+                  @json(old('due_date_gregorian'));
+
+              initPicker(editRoot)?.sync();
+          }
+
       @endif
 
-      // ===== درگ و دراپ وظایف =====
+      // بستن مودال با کلیک روی پس‌زمینه
+      modal.addEventListener('click', (event) => {
+          if (event.target === modal) {
+              closeEditModal();
+          }
+      });
+
+      // Drag & Drop وظایف
       const taskCards = document.querySelectorAll('.task-card');
       const taskColumns = document.querySelectorAll('.task-column');
+
       let draggedTask = null;
 
       taskCards.forEach(card => {
-        card.addEventListener('dragstart', () => {
-          draggedTask = card;
-          setTimeout(() => card.classList.add('opacity-50'), 0);
-        });
-        card.addEventListener('dragend', () => {
-          card.classList.remove('opacity-50');
-          draggedTask = null;
-        });
+
+          card.addEventListener('dragstart', () => {
+              draggedTask = card;
+
+              setTimeout(() => {
+                  card.classList.add('opacity-50');
+              }, 0);
+          });
+
+          card.addEventListener('dragend', () => {
+              card.classList.remove('opacity-50');
+              draggedTask = null;
+          });
+
       });
 
       taskColumns.forEach(column => {
-        column.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          column.classList.add('bg-gray-100');
-        });
-        column.addEventListener('dragleave', () => column.classList.remove('bg-gray-100'));
-        column.addEventListener('drop', async (e) => {
-          e.preventDefault();
-          column.classList.remove('bg-gray-100');
-          if (!draggedTask) return;
-          const taskId = draggedTask.dataset.taskId;
-          const newStatus = column.dataset.status;
-          column.appendChild(draggedTask);
-          const updated = await updateTaskStatus(taskId, newStatus);
-          if (updated) location.reload();
-        });
+
+          column.addEventListener('dragover', (e) => {
+              e.preventDefault();
+              column.classList.add('bg-gray-100');
+          });
+
+          column.addEventListener('dragleave', () => {
+              column.classList.remove('bg-gray-100');
+          });
+
+          column.addEventListener('drop', async (e) => {
+              e.preventDefault();
+
+              column.classList.remove('bg-gray-100');
+
+              if (!draggedTask) {
+                  return;
+              }
+
+              const taskId = draggedTask.dataset.taskId;
+              const newStatus = column.dataset.status;
+              const oldColumn = draggedTask.parentElement;
+
+              if (oldColumn === column) {
+                  return;
+              }
+
+              const oldStatus = oldColumn.dataset.status;
+
+              column.appendChild(draggedTask);
+
+              const updated = await updateTaskStatus(taskId, newStatus);
+
+              if (updated) {
+                  location.reload();
+              } else {
+                  oldColumn.appendChild(draggedTask);
+                  alert('تغییر وضعیت وظیفه انجام نشد.');
+              }
+          });
+
       });
 
       async function updateTaskStatus(taskId, status) {
-        try {
-          const response = await fetch(`/tasks/${taskId}/status`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'X-CSRF-TOKEN': '{{ csrf_token() }}',
-              'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({
-              status
-            })
-          });
-          if (!response.ok) throw new Error('Update failed');
-          return true;
-        } catch (error) {
-          console.error(error);
-          return false;
-        }
+          try {
+              const response = await fetch(
+                  `/tasks/${encodeURIComponent(taskId)}/status`,
+                  {
+                      method: 'PATCH',
+                      headers: {
+                          'Content-Type': 'application/json',
+                          'Accept': 'application/json',
+                          'X-CSRF-TOKEN': @json(csrf_token()),
+                          'X-Requested-With': 'XMLHttpRequest'
+                      },
+                      body: JSON.stringify({ status })
+                  }
+              );
+
+              if (!response.ok) {
+                  throw new Error('Update failed');
+              }
+
+              return true;
+
+          } catch (error) {
+              console.error(error);
+              return false;
+          }
       }
-      })();
 
-
-
-
-
-    
+  })();
   </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 </x-dashboard-layout>

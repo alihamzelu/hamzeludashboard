@@ -163,7 +163,7 @@
 
 </head>
 
-<body class="bg-[#F4F7FB] text-slate-800">
+<body class="bg-[#e7e6e6] text-slate-800">
 
     <div class="flex">
         @include('components.dashboard.sidebar')
