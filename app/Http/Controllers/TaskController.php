@@ -42,10 +42,6 @@ class TaskController extends Controller
         return $userIds->all();
     }
 
-    /**
-     * ذخیره مسئول‌ها و حفظ سازگاری موقت با assigned_to
-     * خروجی: شناسه مسئول‌هایی که تازه اضافه شده‌اند
-     */
     private function syncTaskAssignees(Task $task, array $userIds): array
     {
         $oldUserIds = $task->users()
@@ -65,9 +61,7 @@ class TaskController extends Controller
             ->all();
     }
 
-    /**
-     * ارسال اعلان فقط به مسئول‌های جدید
-     */
+
     private function notifyNewAssignees(Task $task, array $userIds): void
     {
         if (empty($userIds)) {
@@ -208,10 +202,7 @@ class TaskController extends Controller
             ->with('success', 'وظیفه با موفقیت ایجاد شد.');
     }
 
-    public function store(
-        StoreTaskRequest $request,
-        Project $project
-    ): RedirectResponse {
+    public function store(StoreTaskRequest $request,Project $project): RedirectResponse {
         $this->authorize('create', $project);
 
         $data = $request->validated();
@@ -283,11 +274,7 @@ class TaskController extends Controller
         return view('tasks.edit', compact('task', 'project', 'users'));
     }
 
-    public function update(
-        UpdateTaskRequest $request,
-        Project $project,
-        Task $task
-    ): RedirectResponse {
+    public function update(UpdateTaskRequest $request,Project $project,Task $task): RedirectResponse {
         abort_if($task->project_id !== $project->id, 404);
 
         $this->authorize('update', $task);
@@ -363,10 +350,7 @@ class TaskController extends Controller
         return back()->with('success', 'وظیفه با موفقیت ایجاد شد.');
     }
 
-    public function updateStatus(
-        Request $request,
-        Task $task
-    ): RedirectResponse|JsonResponse {
+    public function updateStatus(Request $request,Task $task): RedirectResponse|JsonResponse {
         $this->authorize('update', $task);
 
         $validated = $request->validate([
