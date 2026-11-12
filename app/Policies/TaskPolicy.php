@@ -34,7 +34,7 @@ class TaskPolicy
         return $project->owner_id === $user->id
             || $project->members()
                 ->where('users.id', $user->id)
-                ->wherePivot('role', 'manager')
+                ->whereIn('project_members.role', ['manager', 'member'])
                 ->exists();
     }
 
